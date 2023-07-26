@@ -50,8 +50,11 @@ def get_ordering_components(message, logger):
     )
     for result_index, result in enumerate(tqdm(message.get("results") or [])):
         clinical_evidence_score = get_clinical_evidence(
-                result, message, logger, db_conn,
-            )
+            result,
+            message,
+            logger,
+            db_conn,
+        )
         result["ordering_components"] = {
             "confidence": get_confidence(result, message, logger),
             "clinical_evidence": clinical_evidence_score,
