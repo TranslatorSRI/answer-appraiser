@@ -4,15 +4,9 @@ import logging
 import os
 import redis
 
-REDIS_PSWD = os.getenv("REDIS_PSWD", "supersecretpassword")
-r = redis.Redis(
-    host="0.0.0.0",
-    port=6379,
-    password=REDIS_PSWD,
-)
 
 def compute_clinical_evidence(
-    result: dict, message, logger: logging.Logger,
+    result: dict, message, logger: logging.Logger, db_conn: redis.Redis
 ):
     """Given a result, compute the clinical evidence score,
 
@@ -32,7 +26,7 @@ def compute_clinical_evidence(
                     logger.error("malformed TRAPI")
                     continue
                 clinical_edge_id = f"{kg_edge['subject']}_{kg_edge['object']}"
-                kg_edge = r.get(clinical_edge_id)
+                kg_edge = db_conn.get(clinical_edge_id)
                 if kg_edge is not None:
                     found_edges.extend(json.loads(kg_edge))
 
