@@ -1,7 +1,7 @@
 """Clinical Evidence Scoring."""
 import json
 import logging
-import os
+import numpy as np
 import redis
 
 
@@ -48,4 +48,4 @@ def compute_clinical_evidence(
             )
         if total_weights > 0:
             clinical_evidence_score /= total_weights
-    return clinical_evidence_score
+    return (1 / (1 + np.exp(-np.abs(clinical_evidence_score))) - 0.5) * 2
