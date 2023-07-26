@@ -32,8 +32,8 @@ def get_confidence(result, message, logger):
     return score_sum
 
 
-def get_clinical_evidence(result, message, logger):
-    return compute_clinical_evidence(result, message, logger)
+def get_clinical_evidence(result, message, logger, db_conn):
+    return compute_clinical_evidence(result, message, logger, db_conn)
 
 
 def get_novelty(result, message, logger):
