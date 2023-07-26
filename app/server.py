@@ -1,9 +1,6 @@
-from io import BytesIO
-import json
 import logging
 import traceback
 import os
-import zipfile
 
 from fastapi import Body, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -127,6 +124,7 @@ async def async_appraise(message, callback, logger: logging.Logger):
         get_ordering_components(message, logger)
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
+    logger.info("Done appraising")
     try:
         logger.info(f"Posting to callback {callback}")
         async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=600.0)) as client:
@@ -144,8 +142,9 @@ async def get_appraisal(
     """Appraise Answers"""
     qid = str(uuid4())[:8]
     query_dict = query.dict()
-    log_level = query_dict.get("log_level") or "WARNING"
+    log_level = query_dict.get("log_level") or "INFO"
     logger = get_logger(qid, log_level)
+    logger.info("Starting async appraisal")
     message = query_dict["message"]
     if not message.get("results"):
         logger.warning("No results given.")
@@ -169,8 +168,9 @@ async def get_appraisal(
 async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
     qid = str(uuid4())[:8]
     query_dict = query.dict()
-    log_level = query_dict.get("log_level") or "WARNING"
+    log_level = query_dict.get("log_level") or "INFO"
     logger = get_logger(qid, log_level)
+    logger.info("Starting sync appraisal")
     message = query_dict["message"]
     if not message.get("results"):
         return JSONResponse(
@@ -181,4 +181,5 @@ async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
         get_ordering_components(message, logger)
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
+    logger.info("Done appraising")
     return Response(message=message)
