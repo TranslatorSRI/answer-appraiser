@@ -1,5 +1,11 @@
 """Compute scores for each result in the given message."""
+import os
+import redis
+from tqdm import tqdm
+
 from .clinical_evidence.compute_clinical_evidence import compute_clinical_evidence
+
+REDIS_PSWD = os.getenv("REDIS_PSWD", "supersecretpassword")
 
 
 def get_confidence(result, message, logger):
@@ -26,8 +32,8 @@ def get_confidence(result, message, logger):
     return score_sum
 
 
-def get_clinical_evidence(result, message, logger, clinical_evidence_edges: dict):
-    return compute_clinical_evidence(result, message, logger, clinical_evidence_edges)
+def get_clinical_evidence(result, message, logger, db_conn):
+    return compute_clinical_evidence(result, message, logger, db_conn)
 
 
 def get_novelty(result, message, logger):
@@ -35,14 +41,23 @@ def get_novelty(result, message, logger):
     return 0
 
 
-def get_ordering_components(message, logger, clinical_evidence_edges: dict):
+def get_ordering_components(message, logger):
     logger.debug(f"Computing scores for {len(message['results'])} results")
-    for result in message.get("results") or []:
+    db_conn = redis.Redis(
+        host="0.0.0.0",
+        port=6379,
+        password=REDIS_PSWD,
+    )
+    for result_index, result in enumerate(tqdm(message.get("results") or [])):
+        clinical_evidence_score = get_clinical_evidence(
+            result,
+            message,
+            logger,
+            db_conn,
+        )
         result["ordering_components"] = {
             "confidence": get_confidence(result, message, logger),
-            "clinical_evidence": get_clinical_evidence(
-                result, message, logger, clinical_evidence_edges
-            ),
+            "clinical_evidence": clinical_evidence_score,
             "novelty": 0,
         }
         if result["ordering_components"]["clinical_evidence"] == 0:

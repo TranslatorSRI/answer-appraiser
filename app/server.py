@@ -1,9 +1,6 @@
-from io import BytesIO
-import json
 import logging
 import traceback
 import os
-import zipfile
 
 from fastapi import Body, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -23,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="Answer Appraiser",
-    version="0.2.0",
+    version="0.2.1",
     terms_of_service="",
     translator_component="Utility",
     translator_teams=["Standards Reference Implementation Team"],
@@ -61,35 +58,6 @@ APP.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-clinical_evidence_edges = {}
-
-
-@APP.on_event("startup")
-def load_clinical_evidence_edges():
-    """Load in precomputed clinical evidence edges.
-
-    This file is very large, ~12GB, so will take some time to load.
-    """
-    global clinical_evidence_edges
-    LOGGER.info("Loading clinical evidence edges...")
-    clinical_evidence_edges_url = os.getenv(
-        "CLINICAL_EVIDENCE_EDGES_URL",
-        "https://stars.renci.org/var/answer_appraiser/edges_merged.zip",
-    )
-    response = httpx.get(clinical_evidence_edges_url)
-    response.raise_for_status()
-    LOGGER.info("Downloaded edges. Unzipping...")
-    buffer = BytesIO(response.content)
-    with zipfile.ZipFile(buffer, "r") as zip_ref:
-        edge_file = zip_ref.namelist()[0]
-        with zip_ref.open(edge_file) as file:
-            content = file.read()
-            decoded_content = content.decode("utf-8")
-
-            clinical_evidence_edges = json.loads(decoded_content)
-    LOGGER.info("Edges loaded!")
-
 
 EXAMPLE = {
     "message": {
@@ -153,9 +121,10 @@ ASYNC_EXAMPLE = {
 
 async def async_appraise(message, callback, logger: logging.Logger):
     try:
-        get_ordering_components(message, logger, clinical_evidence_edges)
+        get_ordering_components(message, logger)
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
+    logger.info("Done appraising")
     try:
         logger.info(f"Posting to callback {callback}")
         async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=600.0)) as client:
@@ -173,8 +142,9 @@ async def get_appraisal(
     """Appraise Answers"""
     qid = str(uuid4())[:8]
     query_dict = query.dict()
-    log_level = query_dict.get("log_level") or "WARNING"
+    log_level = query_dict.get("log_level") or "INFO"
     logger = get_logger(qid, log_level)
+    logger.info("Starting async appraisal")
     message = query_dict["message"]
     if not message.get("results"):
         logger.warning("No results given.")
@@ -198,8 +168,9 @@ async def get_appraisal(
 async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
     qid = str(uuid4())[:8]
     query_dict = query.dict()
-    log_level = query_dict.get("log_level") or "WARNING"
+    log_level = query_dict.get("log_level") or "INFO"
     logger = get_logger(qid, log_level)
+    logger.info("Starting sync appraisal")
     message = query_dict["message"]
     if not message.get("results"):
         return JSONResponse(
@@ -207,7 +178,8 @@ async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
             status_code=400,
         )
     try:
-        get_ordering_components(message, logger, clinical_evidence_edges)
+        get_ordering_components(message, logger)
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
+    logger.info("Done appraising")
     return Response(message=message)

@@ -1,3 +1,29 @@
+"""Mock Redis."""
+import fakeredis
+import json
+
+
+def redisMock():
+    redis = fakeredis.FakeRedis()
+    redis.set(
+        "UMLS:C0021641_MONDO:0005015",
+        json.dumps(
+            [
+                {
+                    "log_odds_ratio": 1.5,
+                    "total_sample_size": 100,
+                },
+                {
+                    "log_odds_ratio": 0.2,
+                    "total_sample_size": 10000,
+                },
+            ]
+        ),
+    )
+    # set up mock function
+    return redis
+
+
 response = {
     "query_graph": {
         "nodes": {

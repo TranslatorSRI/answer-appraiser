@@ -1,9 +1,12 @@
 """Clinical Evidence Scoring."""
+import json
 import logging
+import numpy as np
+import redis
 
 
 def compute_clinical_evidence(
-    result: dict, message, logger: logging.Logger, clinical_evidence_edges: dict
+    result: dict, message, logger: logging.Logger, db_conn: redis.Redis
 ):
     """Given a result, compute the clinical evidence score,
 
@@ -23,8 +26,9 @@ def compute_clinical_evidence(
                     logger.error("malformed TRAPI")
                     continue
                 clinical_edge_id = f"{kg_edge['subject']}_{kg_edge['object']}"
-                if kg_edge and clinical_edge_id in clinical_evidence_edges:
-                    found_edges.extend(clinical_evidence_edges[clinical_edge_id])
+                kg_edge = db_conn.get(clinical_edge_id)
+                if kg_edge is not None:
+                    found_edges.extend(json.loads(kg_edge))
 
     # Compute the clinical evidence score given all clinical kp edges
     # Score is computed by:
@@ -44,4 +48,4 @@ def compute_clinical_evidence(
             )
         if total_weights > 0:
             clinical_evidence_score /= total_weights
-    return clinical_evidence_score
+    return (1 / (1 + np.exp(-np.abs(clinical_evidence_score))) - 0.5) * 2
