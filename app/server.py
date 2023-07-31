@@ -1,8 +1,8 @@
 import logging
+import redis
 import traceback
-import os
 
-from fastapi import Body, BackgroundTasks
+from fastapi import Body, BackgroundTasks, HTTPException, status
 from fastapi.responses import JSONResponse
 import httpx
 from starlette.middleware.cors import CORSMiddleware
@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from reasoner_pydantic import AsyncQuery, AsyncQueryResponse, Response, Query
 
+from .config import settings
 from .logger import setup_logger, get_logger
 from .trapi import TRAPI
 from .ordering_components import get_ordering_components
@@ -20,7 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="Answer Appraiser",
-    version="0.2.1",
+    version="0.2.2",
     terms_of_service="",
     translator_component="Utility",
     translator_teams=["Standards Reference Implementation Team"],
@@ -33,21 +34,16 @@ openapi_args = dict(
     },
 )
 
-OPENAPI_SERVER_URL = os.getenv("OPENAPI_SERVER_URL")
-OPENAPI_SERVER_MATURITY = os.getenv("OPENAPI_SERVER_MATURITY", "development")
-OPENAPI_SERVER_LOCATION = os.getenv("OPENAPI_SERVER_LOCATION", "RENCI")
-TRAPI_VERSION = os.getenv("TRAPI_VERSION", "1.4.0")
-
-if OPENAPI_SERVER_URL:
+if settings.openapi_server_url:
     openapi_args["servers"] = [
         {
-            "url": OPENAPI_SERVER_URL,
-            "x-maturity": OPENAPI_SERVER_MATURITY,
-            "x-location": OPENAPI_SERVER_LOCATION,
+            "url": settings.openapi_server_url,
+            "x-maturity": settings.openapi_server_maturity,
+            "x-location": settings.openapi_server_location,
         },
     ]
 
-openapi_args["trapi"] = TRAPI_VERSION
+openapi_args["trapi"] = settings.trapi_version
 
 APP = TRAPI(**openapi_args)
 
@@ -183,3 +179,17 @@ async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
     logger.info("Done appraising")
     return Response(message=message)
+
+
+@APP.get("/redis_ready")
+def check_redis_readiness():
+    """Check if redis is started and ready to accept connections"""
+    try:
+        r = redis.Redis(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            password=settings.redis_password,
+        )
+        r.keys()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)

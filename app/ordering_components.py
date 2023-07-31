@@ -3,9 +3,15 @@ import os
 import redis
 from tqdm import tqdm
 
+from .config import settings
 from .clinical_evidence.compute_clinical_evidence import compute_clinical_evidence
 
-REDIS_PSWD = os.getenv("REDIS_PSWD", "supersecretpassword")
+redis_pool = redis.ConnectionPool(
+    host=settings.redis_host,
+    port=settings.redis_port,
+    db=0,
+    password=settings.redis_password,
+)
 
 
 def get_confidence(result, message, logger):
@@ -43,11 +49,7 @@ def get_novelty(result, message, logger):
 
 def get_ordering_components(message, logger):
     logger.debug(f"Computing scores for {len(message['results'])} results")
-    db_conn = redis.Redis(
-        host="0.0.0.0",
-        port=6379,
-        password=REDIS_PSWD,
-    )
+    db_conn = redis.Redis(connection_pool=redis_pool)
     for result_index, result in enumerate(tqdm(message.get("results") or [])):
         clinical_evidence_score = get_clinical_evidence(
             result,
