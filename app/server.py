@@ -1,6 +1,5 @@
 import logging
 import traceback
-import os
 
 from fastapi import Body, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -10,6 +9,7 @@ from uuid import uuid4
 
 from reasoner_pydantic import AsyncQuery, AsyncQueryResponse, Response, Query
 
+from .config import settings
 from .logger import setup_logger, get_logger
 from .trapi import TRAPI
 from .ordering_components import get_ordering_components
@@ -33,21 +33,16 @@ openapi_args = dict(
     },
 )
 
-OPENAPI_SERVER_URL = os.getenv("OPENAPI_SERVER_URL")
-OPENAPI_SERVER_MATURITY = os.getenv("OPENAPI_SERVER_MATURITY", "development")
-OPENAPI_SERVER_LOCATION = os.getenv("OPENAPI_SERVER_LOCATION", "RENCI")
-TRAPI_VERSION = os.getenv("TRAPI_VERSION", "1.4.0")
-
-if OPENAPI_SERVER_URL:
+if settings.openapi_server_url:
     openapi_args["servers"] = [
         {
-            "url": OPENAPI_SERVER_URL,
-            "x-maturity": OPENAPI_SERVER_MATURITY,
-            "x-location": OPENAPI_SERVER_LOCATION,
+            "url": settings.openapi_server_url,
+            "x-maturity": settings.openapi_server_maturity,
+            "x-location": settings.openapi_server_location,
         },
     ]
 
-openapi_args["trapi"] = TRAPI_VERSION
+openapi_args["trapi"] = settings.trapi_version
 
 APP = TRAPI(**openapi_args)
 
