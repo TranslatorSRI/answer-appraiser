@@ -21,7 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="Answer Appraiser",
-    version="0.2.1",
+    version="0.2.2",
     terms_of_service="",
     translator_component="Utility",
     translator_teams=["Standards Reference Implementation Team"],
