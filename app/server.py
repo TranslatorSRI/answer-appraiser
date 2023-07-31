@@ -1,7 +1,8 @@
 import logging
+import redis
 import traceback
 
-from fastapi import Body, BackgroundTasks
+from fastapi import Body, BackgroundTasks, HTTPException, status
 from fastapi.responses import JSONResponse
 import httpx
 from starlette.middleware.cors import CORSMiddleware
@@ -178,3 +179,17 @@ async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
     logger.info("Done appraising")
     return Response(message=message)
+
+
+@APP.get("/redis_ready")
+def check_redis_readiness():
+    """Check if redis is started and ready to accept connections"""
+    try:
+        r = redis.Redis(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            password=settings.redis_password,
+        )
+        r.keys()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
