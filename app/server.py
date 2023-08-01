@@ -21,7 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="Answer Appraiser",
-    version="0.2.2",
+    version="0.2.3",
     terms_of_service="",
     translator_component="Utility",
     translator_teams=["Standards Reference Implementation Team"],
@@ -190,6 +190,6 @@ def check_redis_readiness():
             port=settings.redis_port,
             password=settings.redis_password,
         )
-        r.keys()
+        r.ping()
     except Exception:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
