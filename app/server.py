@@ -190,6 +190,6 @@ def check_redis_readiness():
             port=settings.redis_port,
             password=settings.redis_password,
         )
-        r.keys()
+        r.ping()
     except Exception:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
