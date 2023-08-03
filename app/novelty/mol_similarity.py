@@ -5,10 +5,11 @@ from rdkit import DataStructs
 from rdkit.Chem import AllChem
 
 
-
-def find_nearest_neighbors(unknown_smiles_dict, known_smiles_dict, similarity_cutoff, num_neighbors):
+def find_nearest_neighbors(
+    unknown_smiles_dict, known_smiles_dict, similarity_cutoff, num_neighbors
+):
     """
-    
+
     Returns:
         Dict
 
@@ -19,19 +20,27 @@ def find_nearest_neighbors(unknown_smiles_dict, known_smiles_dict, similarity_cu
         num_neighbors: int: 1
 
     """
-    unknown_smiles = {key:value for key,value in unknown_smiles_dict.items() if value != "No SMILES could be found"}
-    known_smiles = {key:value for key,value in known_smiles_dict.items() if value != "No SMILES could be found"}
+    unknown_smiles = {
+        key: value
+        for key, value in unknown_smiles_dict.items()
+        if value != "No SMILES could be found"
+    }
+    known_smiles = {
+        key: value
+        for key, value in known_smiles_dict.items()
+        if value != "No SMILES could be found"
+    }
 
     # Convert input SMILES to a molecule
     known_mols = {}
-    for key,value in known_smiles.items():
+    for key, value in known_smiles.items():
         known_mol = Chem.MolFromSmiles(value)
         if known_mol is None:
-            raise ValueError("Invalid SMILES string for",key)
+            raise ValueError("Invalid SMILES string for", key)
         else:
-            known_mols.update({key:known_mol})
+            known_mols.update({key: known_mol})
     nearest_neighbor_mapping = {}
-    for unknownkey,value in unknown_smiles.items():
+    for unknownkey, value in unknown_smiles.items():
         query_mol = Chem.MolFromSmiles(value)
         if query_mol is None:
             raise ValueError("Invalid SMILES string")
@@ -55,5 +64,5 @@ def find_nearest_neighbors(unknown_smiles_dict, known_smiles_dict, similarity_cu
             index, similarity = similarities[i]
             if similarity >= similarity_cutoff:
                 neighbors.append((index, similarity))
-        nearest_neighbor_mapping.update({unknownkey:neighbors})
+        nearest_neighbor_mapping.update({unknownkey: neighbors})
     return nearest_neighbor_mapping

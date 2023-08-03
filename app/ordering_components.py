@@ -52,7 +52,9 @@ def get_ordering_components(message, logger):
     logger.debug(f"Computing scores for {len(message['results'])} results")
     db_conn = redis.Redis(connection_pool=redis_pool)
     novelty_scores_dict = get_novelty(message, logger).to_dict(orient="index")
-    novelty_scores = {node["drug"]: node["novelty_score"] for node in novelty_scores_dict.values()}
+    novelty_scores = {
+        node["drug"]: node["novelty_score"] for node in novelty_scores_dict.values()
+    }
     for result in tqdm(message.get("results") or []):
         clinical_evidence_score = get_clinical_evidence(
             result,
@@ -70,4 +72,6 @@ def get_ordering_components(message, logger):
             for node_bindings in result.get("node_bindings", {}).values():
                 for node_binding in node_bindings:
                     if node_binding["id"] in novelty_scores:
-                        result["ordering_components"]["novelty"] = novelty_scores[node_binding["id"]]
+                        result["ordering_components"]["novelty"] = novelty_scores[
+                            node_binding["id"]
+                        ]
