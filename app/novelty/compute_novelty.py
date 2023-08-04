@@ -2,6 +2,7 @@ import pandas as pd
 from datetime import date
 import requests
 import numpy as np
+import traceback
 
 from .known import find_known_results
 from .extr_smile_molpro_by_id import mol_to_smile_molpro
@@ -78,7 +79,7 @@ def get_publication_info(pub_id):
         response.raise_for_status()
         response = response.json()
     except Exception:
-        return {
+        response = {
             "_meta": {
                 "n_results": 0,
             },
@@ -169,7 +170,6 @@ def extracting_drug_fda_publ_date(message, unknown):
     today = date.today()
 
     res_chk = 1
-    # for edge in message['knowledge_graph']['edges'].keys():
     query_known, query_unknown, query_chk = query_id(message)
     idi = -1
     for tmp in unknown:
@@ -406,12 +406,14 @@ def compute_novelty(message, logger):
     known, unknown = find_known_results(message)
     #
     # # Step 2
-    similarity_map = molecular_sim(known, unknown, message)
 
+    # start = time.time()
     df, query_chk = extracting_drug_fda_publ_date(message, unknown)
+    # print(f"Time to extract fda status and Publication data:{time.time()-start}")
     #         # print(df.head())
     #         # print(query_chk)
     #
+    # df.to_excel(f'DATAFRAME.xlsx', header=False, index=False)
     # df = pd.read_excel('DATAFRAME.xlsx', names=['edge', 'drug', 'fda status', 'publications', 'number_of_publ', 'age_oldest_pub'])
     # query_chk = 1
 
@@ -427,6 +429,20 @@ def compute_novelty(message, logger):
     # print(df.head())
     # print(similarity_map)
     if query_chk == 1:
+        # start = time.time()
+        try:
+            similarity_map = molecular_sim(known, unknown, message)
+            df["similarity"] = df.apply(
+                lambda row: similarity_map[row["drug"]][0][1]
+                if row["drug"] in similarity_map.keys()
+                else np.nan,
+                axis=1,
+            )
+        except Exception as e:
+            logger.error(traceback.format_exc())
+            df = df.assign(similarity=np.nan)
+
+        # print(f"Time to compute Molecular Similarity:{time.time() - start}")
         # Step 3:
         # calculating the recency
         df["recency"] = df.apply(
@@ -439,15 +455,9 @@ def compute_novelty(message, logger):
         )
         #
         # # Step 4:
-        # # This section will be added later. Currently just putting 'NaN':
+        # # Calculating the Similarity:
         # nearest_neighbours = calculate_nn_distance(res_known, res_unknown, 0, 1)
 
-        df["similarity"] = df.apply(
-            lambda row: similarity_map[row["drug"]][0][1]
-            if row["drug"] in similarity_map.keys()
-            else np.nan,
-            axis=1,
-        )
         # df = df.assign(similarity=np.nan)
 
         # # Step 5:
@@ -458,6 +468,7 @@ def compute_novelty(message, logger):
             ),
             axis=1,
         )
+        # df.to_excel(f'DATAFRAME_result.xlsx', header=False, index=False)
 
         # # # Step 6
         # # # Just sort them:
@@ -466,14 +477,5 @@ def compute_novelty(message, logger):
         )
     else:
         df = df.assign(novelty_score=0)
+    # df.to_excel(f'DATAFRAME_NOVELTY.xlsx', header=False, index=False)
     return df
-
-
-# for i in list(range(1, 5)):
-# start = time.time()
-# temp = compute_novelty('mergedAnnotatedOutput.json')
-# if temp.empty:
-#     print(f"No Results in mergedAnnotatedOutput.json")
-# else:
-#     temp_json = temp.to_json(f'mergedAnnotatedOutput_scores.json', orient='values')
-# print(time.time()-start)
