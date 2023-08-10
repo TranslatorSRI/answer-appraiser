@@ -33,9 +33,13 @@ def mol_to_smile_molpro(molecules):
 
                     for i in range(json_response["size"]):
                         key_list = ["identifiers"]
-                        if set(key_list).issubset(collec_response["elements"][i].keys()):
+                        if set(key_list).issubset(
+                            collec_response["elements"][i].keys()
+                        ):
                             identifiers = collec_response["elements"][i]["identifiers"]
-                            smile = identifiers.get("smiles", "No SMILES could be found")
+                            smile = identifiers.get(
+                                "smiles", "No SMILES could be found"
+                            )
                             smiles[data_mol[i]] = smile
                         else:
                             smiles[data_mol[i]] = "No identifiers could be found"
