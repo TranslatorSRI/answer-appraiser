@@ -43,17 +43,19 @@ def get_clinical_evidence(result, message, logger, db_conn):
     return compute_clinical_evidence(result, message, logger, db_conn)
 
 
-def get_novelty(message, logger):
-    return compute_novelty(message, logger)
+async def get_novelty(message, logger):
+    novelty_df = await compute_novelty(message, logger)
+    novelty_dict = novelty_df.to_dict(orient="index")
+    novelty_scores = {
+        node["drug"]: node["novelty_score"] for node in novelty_dict.values()
+    }
+    return novelty_scores
 
 
-def get_ordering_components(message, logger):
+async def get_ordering_components(message, logger):
     logger.debug(f"Computing scores for {len(message['results'])} results")
     db_conn = redis.Redis(connection_pool=redis_pool)
-    novelty_scores_dict = get_novelty(message, logger).to_dict(orient="index")
-    novelty_scores = {
-        node["drug"]: node["novelty_score"] for node in novelty_scores_dict.values()
-    }
+    novelty_scores = await get_novelty(message, logger)
     for result in tqdm(message.get("results") or []):
         clinical_evidence_score = get_clinical_evidence(
             result,

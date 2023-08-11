@@ -117,7 +117,7 @@ ASYNC_EXAMPLE = {
 
 async def async_appraise(message, callback, logger: logging.Logger):
     try:
-        get_ordering_components(message, logger)
+        await get_ordering_components(message, logger)
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
     logger.info("Done appraising")
@@ -174,7 +174,7 @@ async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
             status_code=400,
         )
     try:
-        get_ordering_components(message, logger)
+        await get_ordering_components(message, logger)
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
     logger.info("Done appraising")

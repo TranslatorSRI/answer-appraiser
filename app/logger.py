@@ -75,3 +75,5 @@ def setup_logger():
         logging_config = json.load(f)
 
     config.dictConfig(logging_config)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
