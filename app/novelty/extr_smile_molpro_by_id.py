@@ -1,7 +1,7 @@
 import httpx
 
 
-def mol_to_smile_molpro(molecules):
+async def mol_to_smile_molpro(molecules):
     """
     Args:
         List
@@ -18,16 +18,16 @@ def mol_to_smile_molpro(molecules):
 
     data_mol = list(set(molecules))
     # print(f'init data: {len(data_mol)}')
-    with httpx.Client(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         while data_mol:
             # print(f'before: {len(data_mol)}')
             data_mol_before = len(data_mol)
-            response = client.post(url, headers=headers, json=data_mol)
+            response = await client.post(url, headers=headers, json=data_mol)
 
             if response.status_code == 200:
                 json_response = response.json()
                 collec_url = json_response["url"]
-                temp_collec_response = client.get(collec_url)
+                temp_collec_response = await client.get(collec_url)
                 if temp_collec_response.status_code == 200:
                     collec_response = temp_collec_response.json()
 

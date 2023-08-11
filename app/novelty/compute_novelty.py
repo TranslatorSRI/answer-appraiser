@@ -20,7 +20,7 @@ The end result of this script displays a table with values from different column
 """
 
 
-def molecular_sim(known, unknown, message):
+async def molecular_sim(known, unknown, message):
     unknown_ids = []
     known_ids = []
     if len(unknown) > 0:
@@ -59,14 +59,14 @@ def molecular_sim(known, unknown, message):
                     message["results"][drug]["node_bindings"][s[1]][0]["id"]
                 )
 
-    smile_unkown = mol_to_smile_molpro(unknown_ids)
-    smile_known = mol_to_smile_molpro(known_ids)
+    smile_unkown = await mol_to_smile_molpro(unknown_ids)
+    smile_known = await mol_to_smile_molpro(known_ids)
 
     similarity_map = find_nearest_neighbors(smile_unkown, smile_known, 0, 1)
     return similarity_map
 
 
-def get_publication_info(pub_id):
+async def get_publication_info(pub_id):
     """
     Args: PMID
     Returns: The publication info
@@ -75,8 +75,8 @@ def get_publication_info(pub_id):
     request_id = "1df88223-c0f8-47f5-a1f3-661b944c7849"
     full_url = f"{base_url}{pub_id}&request_id={request_id}"
     try:
-        with httpx.Client(timeout=30) as client:
-            response = client.get(full_url)
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(full_url)
             response.raise_for_status()
             response = response.json()
     except Exception:
@@ -141,7 +141,7 @@ def recency_function_exp(number_of_publ, age_of_oldest_publ, max_number, max_age
     return recency
 
 
-def extracting_drug_fda_publ_date(message, unknown):
+async def extracting_drug_fda_publ_date(message, unknown):
     """
     Upon querying, the response is returned as a list containing 10 dictionaries,
     with each dictionary representing the response from an ARA. The function 'extracting_drug_fda_publ_date'
@@ -246,7 +246,9 @@ def extracting_drug_fda_publ_date(message, unknown):
                                 # print(publications)
                                 publications_1 = ",".join(publications)
                                 try:
-                                    response_pub = get_publication_info(publications_1)
+                                    response_pub = await get_publication_info(
+                                        publications_1
+                                    )
                                     if response_pub["_meta"]["n_results"] == 0:
                                         age_oldest = np.nan
                                     else:
@@ -392,7 +394,7 @@ def novelty_score(fda_status, recency, similarity):
     return score
 
 
-def compute_novelty(message, logger):
+async def compute_novelty(message, logger):
     """INPUT: JSON Response with merged annotated results for a 1-H query
 
     1. load the json file
@@ -409,7 +411,7 @@ def compute_novelty(message, logger):
     # # Step 2
 
     # start = time.time()
-    df, query_chk = extracting_drug_fda_publ_date(message, unknown)
+    df, query_chk = await extracting_drug_fda_publ_date(message, unknown)
     # print(f"Time to extract fda status and Publication data:{time.time()-start}")
     #         # print(df.head())
     #         # print(query_chk)
@@ -432,7 +434,7 @@ def compute_novelty(message, logger):
     if query_chk == 1:
         # start = time.time()
         try:
-            similarity_map = molecular_sim(known, unknown, message)
+            similarity_map = await molecular_sim(known, unknown, message)
             df["similarity"] = df.apply(
                 lambda row: similarity_map[row["drug"]][0][1]
                 if row["drug"] in similarity_map.keys()
