@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import date
-import requests
+import httpx
 import numpy as np
 import traceback
 
@@ -75,9 +75,10 @@ def get_publication_info(pub_id):
     request_id = "1df88223-c0f8-47f5-a1f3-661b944c7849"
     full_url = f"{base_url}{pub_id}&request_id={request_id}"
     try:
-        response = requests.get(full_url)
-        response.raise_for_status()
-        response = response.json()
+        with httpx.Client(timeout=30) as client:
+            response = client.get(full_url)
+            response.raise_for_status()
+            response = response.json()
     except Exception:
         response = {
             "_meta": {
