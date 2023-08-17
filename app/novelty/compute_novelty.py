@@ -199,9 +199,7 @@ async def extracting_drug_fda_publ_date(message, unknown):
                     fda = []
                     pub = []
                     for i in range(len(edge_attributes)):
-                        att_type_id[i] = edge_attributes[i][
-                            "attribute_type_id"
-                        ]
+                        att_type_id[i] = edge_attributes[i]["attribute_type_id"]
 
                     for key in att_type_id.keys():
                         if att_type_id[key] in attribute_type_id_list_fda:
@@ -210,10 +208,7 @@ async def extracting_drug_fda_publ_date(message, unknown):
                             pub.append(key)
 
                     if len(fda) > 0:
-                        if (
-                            edge_attributes[fda[0]]["value"]
-                            == "FDA Approval"
-                        ):
+                        if edge_attributes[fda[0]]["value"] == "FDA Approval":
                             fda_status = 0.0
                         else:
                             fda_status = 1.0
@@ -252,9 +247,9 @@ async def extracting_drug_fda_publ_date(message, unknown):
                                             publ_year.extend(
                                                 [
                                                     int(
-                                                        response_pub["results"][
-                                                            key
-                                                        ]["pub_year"]
+                                                        response_pub["results"][key][
+                                                            "pub_year"
+                                                        ]
                                                     )
                                                 ]
                                             )
@@ -277,10 +272,7 @@ async def extracting_drug_fda_publ_date(message, unknown):
                     )
             else:
                 if query_unknown in ["biolink:Gene", "biolink:Protein"]:
-                    if (
-                        "NCBI" in edge["subject"]
-                        or "GO" in edge["subject"]
-                    ):
+                    if "NCBI" in edge["subject"] or "GO" in edge["subject"]:
                         gene_idx = edge["subject"]
                     else:
                         gene_idx = edge["object"]
