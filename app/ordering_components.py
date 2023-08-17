@@ -1,6 +1,7 @@
 """Compute scores for each result in the given message."""
 import redis
 from tqdm import tqdm
+import traceback
 
 from .config import settings
 from .clinical_evidence.compute_clinical_evidence import compute_clinical_evidence
@@ -24,7 +25,7 @@ def get_confidence(result, message, logger):
 
     eps is set to 0.001
     """
-    score_sum = 0
+    score_sum = 0.0
     non_zero_count = 0
     eps = 0.001
     for analysis in result.get("analyses") or []:
@@ -55,24 +56,36 @@ async def get_novelty(message, logger):
 async def get_ordering_components(message, logger):
     logger.debug(f"Computing scores for {len(message['results'])} results")
     db_conn = redis.Redis(connection_pool=redis_pool)
-    novelty_scores = await get_novelty(message, logger)
+    novelty_scores = {}
+    try:
+        novelty_scores = await get_novelty(message, logger)
+    except Exception:
+        logger.error(f"Novelty score failed: {traceback.format_exc()}")
     for result in tqdm(message.get("results") or []):
-        clinical_evidence_score = get_clinical_evidence(
-            result,
-            message,
-            logger,
-            db_conn,
-        )
+        confidence = 0.0
+        try:
+            confidence = get_confidence(result, message, logger)
+        except Exception:
+            logger.error(f"Confidence score failed: {traceback.format_exc()}")
+        clinical_evidence_score = 0.0
+        try:
+            clinical_evidence_score = get_clinical_evidence(
+                result,
+                message,
+                logger,
+                db_conn,
+            )
+        except Exception:
+            logger.error(f"Clinical evidence score failed: {traceback.format_exc()}")
         result["ordering_components"] = {
-            "confidence": get_confidence(result, message, logger),
+            "confidence": confidence,
             "clinical_evidence": clinical_evidence_score,
-            "novelty": 0,
+            "novelty": 0.0,
         }
         if clinical_evidence_score == 0:
             # Only compute novelty if there is no clinical evidence
             for node_bindings in result.get("node_bindings", {}).values():
                 for node_binding in node_bindings:
-                    if node_binding["id"] in novelty_scores:
-                        result["ordering_components"]["novelty"] = novelty_scores[
-                            node_binding["id"]
-                        ]
+                    result["ordering_components"]["novelty"] = novelty_scores.get(
+                        node_binding["id"], 0.0
+                    )

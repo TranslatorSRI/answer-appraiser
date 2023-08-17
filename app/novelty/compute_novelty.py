@@ -177,100 +177,89 @@ async def extracting_drug_fda_publ_date(message, unknown):
         tmp_res = message["results"][tmp]["analyses"][0]["edge_bindings"]
         for tmp_1 in tmp_res:
             idi += 1
-            edge = message["results"][tmp]["analyses"][0]["edge_bindings"][tmp_1][0][
+            edge_id = message["results"][tmp]["analyses"][0]["edge_bindings"][tmp_1][0][
                 "id"
             ]
-            # edge_list = list(message['knowledge_graph']['edges'].keys())
-            # for idx, idi in enumerate(edge_list):
-            #     if idx % 20 == 0:
-            #         print(f'progressing {idx}')
-            # edge = edge_list[idx]
-            edge_attribute = message["knowledge_graph"]["edges"][edge]
-            # if set(['subject', 'object']).issubset(edge_attribute.keys()):
+            edge = message["knowledge_graph"]["edges"][edge_id]
             if query_chk == 1:
                 if (
-                    "PUBCHEM" in edge_attribute["subject"]
-                    or "CHEMBL" in edge_attribute["subject"]
-                    or "UNII" in edge_attribute["subject"]
-                    or "RXNORM" in edge_attribute["subject"]
-                    or "UMLS" in edge_attribute["subject"]
-                    or not "MONDO" in edge_attribute["subject"]
+                    "PUBCHEM" in edge["subject"]
+                    or "CHEMBL" in edge["subject"]
+                    or "UNII" in edge["subject"]
+                    or "RXNORM" in edge["subject"]
+                    or "UMLS" in edge["subject"]
+                    or not "MONDO" in edge["subject"]
                 ):
-                    drug_idx = edge_attribute["subject"]
+                    drug_idx = edge["subject"]
                 else:
-                    drug_idx = edge_attribute["object"]
-                if set(["attributes"]).issubset(edge_attribute.keys()):
-                    if len(edge_attribute["attributes"]) > 0:
-                        att_type_id = {}
-                        fda = []
-                        pub = []
-                        for i in range(len(edge_attribute["attributes"])):
-                            att_type_id[i] = edge_attribute["attributes"][i][
-                                "attribute_type_id"
-                            ]
+                    drug_idx = edge["object"]
+                edge_attributes = edge.get("attributes") or []
+                if len(edge_attributes) > 0:
+                    att_type_id = {}
+                    fda = []
+                    pub = []
+                    for i in range(len(edge_attributes)):
+                        att_type_id[i] = edge_attributes[i]["attribute_type_id"]
 
-                        for key in att_type_id.keys():
-                            if att_type_id[key] in attribute_type_id_list_fda:
-                                fda.append(key)
-                            elif att_type_id[key] in attribute_type_id_list_pub:
-                                pub.append(key)
+                    for key in att_type_id.keys():
+                        if att_type_id[key] in attribute_type_id_list_fda:
+                            fda.append(key)
+                        elif att_type_id[key] in attribute_type_id_list_pub:
+                            pub.append(key)
 
-                        if len(fda) > 0:
-                            if (
-                                edge_attribute["attributes"][fda[0]]["value"]
-                                == "FDA Approval"
-                            ):
-                                fda_status = 0.0
-                            else:
-                                fda_status = 1.0
+                    if len(fda) > 0:
+                        if edge_attributes[fda[0]]["value"] == "FDA Approval":
+                            fda_status = 0.0
                         else:
-                            fda_status = None
+                            fda_status = 1.0
+                    else:
+                        fda_status = None
 
-                        # Publication
-                        if len(pub) > 0:
-                            publications = edge_attribute["attributes"][pub[0]]["value"]
-                            if "|" in publications:
-                                publications = publications.split("|")
-                            if type(publications) == "str":
-                                publications = [publications]
+                    # Publication
+                    if len(pub) > 0:
+                        publications = edge_attributes[pub[0]]["value"]
+                        if "|" in publications:
+                            publications = publications.split("|")
+                        if type(publications) == "str":
+                            publications = [publications]
 
-                            # Removal of all publication entries that are links
-                            publications = [x for x in publications if "http" not in x]
-                            # Removal of all publication entries that are Clinical Trials
-                            publications = [
-                                x for x in publications if "clinicaltrials" not in x
-                            ]
-                            number_of_publ = len(publications)
+                        # Removal of all publication entries that are links
+                        publications = [x for x in publications if "http" not in x]
+                        # Removal of all publication entries that are Clinical Trials
+                        publications = [
+                            x for x in publications if "clinicaltrials" not in x
+                        ]
+                        number_of_publ = len(publications)
 
-                            if len(publications) > 0:
-                                # print(publications)
-                                publications_1 = ",".join(publications)
-                                try:
-                                    response_pub = await get_publication_info(
-                                        publications_1
-                                    )
-                                    if response_pub["_meta"]["n_results"] == 0:
-                                        age_oldest = np.nan
-                                    else:
-                                        publ_year = []
-                                        for key in response_pub["results"].keys():
-                                            if "not_found" not in key:
-                                                publ_year.extend(
-                                                    [
-                                                        int(
-                                                            response_pub["results"][
-                                                                key
-                                                            ]["pub_year"]
-                                                        )
-                                                    ]
-                                                )
-                                        age_oldest = today.year - min(publ_year)
-                                except ConnectionError as e:
+                        if len(publications) > 0:
+                            # print(publications)
+                            publications_1 = ",".join(publications)
+                            try:
+                                response_pub = await get_publication_info(
+                                    publications_1
+                                )
+                                if response_pub["_meta"]["n_results"] == 0:
                                     age_oldest = np.nan
-                        else:
-                            publications = None
-                            number_of_publ = 0.0
-                            age_oldest = np.nan
+                                else:
+                                    publ_year = []
+                                    for key in response_pub["results"].keys():
+                                        if "not_found" not in key:
+                                            publ_year.extend(
+                                                [
+                                                    int(
+                                                        response_pub["results"][key][
+                                                            "pub_year"
+                                                        ]
+                                                    )
+                                                ]
+                                            )
+                                    age_oldest = today.year - min(publ_year)
+                            except ConnectionError as e:
+                                age_oldest = np.nan
+                    else:
+                        publications = None
+                        number_of_publ = 0.0
+                        age_oldest = np.nan
                     drug_idx_fda_status.append(
                         (
                             idi,
@@ -283,19 +272,16 @@ async def extracting_drug_fda_publ_date(message, unknown):
                     )
             else:
                 if query_unknown in ["biolink:Gene", "biolink:Protein"]:
-                    if (
-                        "NCBI" in edge_attribute["subject"]
-                        or "GO" in edge_attribute["subject"]
-                    ):
-                        gene_idx = edge_attribute["subject"]
+                    if "NCBI" in edge["subject"] or "GO" in edge["subject"]:
+                        gene_idx = edge["subject"]
                     else:
-                        gene_idx = edge_attribute["object"]
+                        gene_idx = edge["object"]
                     drug_idx_fda_status.append((idi, gene_idx))
                 elif query_unknown in ["biolink:Disease", "biolink:Phenotype"]:
-                    if "MONDO" in edge_attribute["subject"]:
-                        dis_idx = edge_attribute["subject"]
+                    if "MONDO" in edge["subject"]:
+                        dis_idx = edge["subject"]
                     else:
-                        dis_idx = edge_attribute["object"]
+                        dis_idx = edge["object"]
                     drug_idx_fda_status.append((idi, dis_idx))
     if query_chk == 1 and res_chk == 1:
         DF = pd.DataFrame(
