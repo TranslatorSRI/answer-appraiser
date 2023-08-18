@@ -82,10 +82,8 @@ async def get_ordering_components(message, logger):
             "clinical_evidence": clinical_evidence_score,
             "novelty": 0.0,
         }
-        if clinical_evidence_score == 0:
-            # Only compute novelty if there is no clinical evidence
-            for node_bindings in result.get("node_bindings", {}).values():
-                for node_binding in node_bindings:
-                    result["ordering_components"]["novelty"] = novelty_scores.get(
-                        node_binding["id"], 0.0
-                    )
+        for node_bindings in result.get("node_bindings", {}).values():
+            for node_binding in node_bindings:
+                result["ordering_components"]["novelty"] = novelty_scores.get(
+                    node_binding["id"], 0.0
+                )

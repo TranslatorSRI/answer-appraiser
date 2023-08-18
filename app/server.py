@@ -21,15 +21,15 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="Answer Appraiser",
-    version="0.3.3",
+    version="0.3.4",
     terms_of_service="",
     translator_component="Utility",
     translator_teams=["Standards Reference Implementation Team"],
     infores="infores:answer-appraiser",
     contact={
-        "name": "Abrar Mesbah",
-        "email": "amesbah@covar.com",
-        "x-id": "uhbrar",
+        "name": "Max Wang",
+        "email": "max@covar.com",
+        "x-id": "maximusunc",
         "x-role": "responsible developer",
     },
 )
