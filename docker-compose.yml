@@ -1,10 +1,20 @@
 version: '3.7'
 
 services:
-  workflow_runner:
+  answer_appraiser:
     image: answer-appraiser
     container_name: answer_appraiser
     build:
       context: .
     ports:
       - '${PORT:-9096}:9096'
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: answer_appraiser_redis
+    build:
+      context: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
