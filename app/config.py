@@ -4,7 +4,7 @@ from pydantic import BaseSettings, AnyUrl
 
 
 class Settings(BaseSettings):
-    openapi_server_url: Optional[AnyUrl]
+    openapi_server_url: AnyUrl = "http://localhost:9096"
     openapi_server_maturity: str = "development"
     openapi_server_location: str = "RENCI"
     trapi_version: str = "1.4.0"

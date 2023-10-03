@@ -16,20 +16,26 @@ class TRAPI(FastAPI):
         self,
         *args,
         contact: Optional[Dict[str, Any]] = None,
+        description: Optional[str] = "",
         terms_of_service: Optional[str] = None,
         translator_component: Optional[str] = None,
         translator_teams: Optional[List[str]] = None,
         infores: Optional[str] = None,
         trapi: Optional[str] = None,
+        biolink_version: Optional[str] = None,
+        servers: Optional[List[Dict]] = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.contact = contact
+        self.description = description
         self.terms_of_service = terms_of_service
         self.translator_component = translator_component
         self.translator_teams = translator_teams
         self.infores = infores
         self.trapi = trapi
+        self.biolink_version = biolink_version
+        self.servers = servers
 
     def openapi(self) -> Dict[str, Any]:
         """Build custom OpenAPI schema."""
@@ -51,14 +57,17 @@ class TRAPI(FastAPI):
 
         openapi_schema["servers"] = self.servers
 
+        openapi_schema["info"]["contact"] = self.contact
+
         openapi_schema["info"]["x-translator"] = {
-            "component": self.translator_component,
-            "team": self.translator_teams,
+            "biolink-version": self.biolink_version,
+            "component": "Utility",
+            "team": "Standards Reference Implementation Team",
             "externalDocs": {
                 "description": "The values for component and team are restricted according to this external JSON schema. See schema and examples at url",
                 "url": "https://github.com/NCATSTranslator/translator_extensions/blob/production/x-translator/",
             },
-            "infores": self.infores,
+            "infores": "infores:sri-answer-appraiser",
         }
         openapi_schema["info"]["x-trapi"] = {
             "version": self.trapi,
@@ -66,9 +75,11 @@ class TRAPI(FastAPI):
                 "description": "The values for version are restricted according to the regex in this external JSON schema. See schema and examples at url",
                 "url": "https://github.com/NCATSTranslator/translator_extensions/blob/production/x-trapi/",
             },
+            "operations": [],
         }
-        openapi_schema["info"]["contact"] = self.contact
-        openapi_schema["info"]["termsOfService"] = self.terms_of_service
+
+        if self.terms_of_service:
+            openapi_schema["info"]["termsOfService"] = self.terms_of_service
 
         self.openapi_schema = openapi_schema
         return self.openapi_schema
