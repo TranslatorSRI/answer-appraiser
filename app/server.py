@@ -20,16 +20,16 @@ setup_logger()
 LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
-    title="Answer Appraiser",
-    version="0.3.4",
+    title="SRI Answer Appraiser",
+    version="0.3.5",
     terms_of_service="",
-    translator_component="Utility",
-    translator_teams=["Standards Reference Implementation Team"],
-    infores="infores:answer-appraiser",
+    description="SRI service that provides metrics for scoring and ordering of results",
+    trapi="1.4.0",
+    biolink_version="3.4.2",
     contact={
         "name": "Max Wang",
         "email": "max@covar.com",
-        "x-id": "maximusunc",
+        "x-id": "https://github.com/maximusunc",
         "x-role": "responsible developer",
     },
 )
@@ -42,8 +42,6 @@ if settings.openapi_server_url:
             "x-location": settings.openapi_server_location,
         },
     ]
-
-openapi_args["trapi"] = settings.trapi_version
 
 APP = TRAPI(**openapi_args)
 
