@@ -62,7 +62,7 @@ class TRAPI(FastAPI):
         openapi_schema["info"]["x-translator"] = {
             "biolink-version": self.biolink_version,
             "component": "Utility",
-            "team": "Standards Reference Implementation Team",
+            "team": ["Standards Reference Implementation Team"],
             "externalDocs": {
                 "description": "The values for component and team are restricted according to this external JSON schema. See schema and examples at url",
                 "url": "https://github.com/NCATSTranslator/translator_extensions/blob/production/x-translator/",
