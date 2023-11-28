@@ -373,10 +373,8 @@ def novelty_score(fda_status, recency, similarity):
             if fda_status == 0:
                 score = score * 0.85
     else:
-        if np.isnan(similarity):
-            score = 0
-        else:
-            score = 1 - similarity
+        score = 0
+     
     return score
 
 
