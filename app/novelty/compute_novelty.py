@@ -374,7 +374,7 @@ def novelty_score(fda_status, recency, similarity):
                 score = score * 0.85
     else:
         score = 0
-     
+
     return score
 
 
