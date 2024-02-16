@@ -1,4 +1,5 @@
 """Test Clinical Evidence function."""
+
 import logging
 
 from app.clinical_evidence.compute_clinical_evidence import compute_clinical_evidence

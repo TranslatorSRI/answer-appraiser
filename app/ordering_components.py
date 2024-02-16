@@ -1,4 +1,5 @@
 """Compute scores for each result in the given message."""
+
 import redis
 from tqdm import tqdm
 import traceback
