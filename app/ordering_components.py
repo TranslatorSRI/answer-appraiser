@@ -1,4 +1,5 @@
 """Compute scores for each result in the given message."""
+
 import redis
 from tqdm import tqdm
 import traceback
@@ -18,26 +19,16 @@ redis_pool = redis.ConnectionPool(
 
 def get_confidence(result, message, logger):
     """
-    This function iterates through the results from multiple ARAs,
-    If only a single score is non-zero the result is thresholded to be in [0,1-eps]
-    If a result has non-zero scores from multiple ARAs,
-    then all the scores are added together and thresholded to be in [0,1]
-
-    eps is set to 0.001
+    This function iterates through the answers from multiple ARAs,
+    It multiplies values of (1- score(ara[i])) for each ara
+    Finally this product value is subtracted from 1
     """
-    score_sum = 0.0
-    non_zero_count = 0
-    eps = 0.001
+    score_product = 1
     for analysis in result.get("analyses") or []:
         if analysis.get("score") is not None:
-            score_sum += analysis["score"]
-            if analysis["score"] > 0:
-                non_zero_count += 1
-    if non_zero_count == 1 and score_sum > 1 - eps:
-        score_sum = 1 - eps
-    elif non_zero_count > 1 and score_sum > 1:
-        score_sum = 1
-    return score_sum
+            score_product = score_product * (1 - analysis["score"])
+    confidence_score = 1 - score_product
+    return confidence_score
 
 
 def get_clinical_evidence(result, message, logger, db_conn):

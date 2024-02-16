@@ -1,4 +1,5 @@
 """Simple script for normalizing kgx node and edge files."""
+
 import httpx
 import jsonlines
 

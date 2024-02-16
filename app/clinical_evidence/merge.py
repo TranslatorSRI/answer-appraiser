@@ -1,4 +1,5 @@
 """Script for combining multiple KGX node and edge files."""
+
 import glob
 import json
 import jsonlines
@@ -63,9 +64,9 @@ if __name__ == "__main__":
                         }
                         if "association" in edge:
                             # from ehr
-                            save_edge[
-                                "predicate"
-                            ] = f"biolink:{edge['association']['predicate']}"
+                            save_edge["predicate"] = (
+                                f"biolink:{edge['association']['predicate']}"
+                            )
                             for attribute in edge["association"]["edge_attributes"]:
                                 if (
                                     attribute["attribute_type_id"]
@@ -91,16 +92,16 @@ if __name__ == "__main__":
                                             == "biolink:log_odds_ratio_95_ci"
                                             and type(sub_attribute["value"]) != str
                                         ):
-                                            save_edge[
-                                                "log_odds_ratio_95_ci"
-                                            ] = sub_attribute["value"]
+                                            save_edge["log_odds_ratio_95_ci"] = (
+                                                sub_attribute["value"]
+                                            )
                                         if (
                                             sub_attribute["attribute_type_id"]
                                             == "biolink:total_sample_size"
                                         ):
-                                            save_edge[
-                                                "total_sample_size"
-                                            ] = sub_attribute["value"]
+                                            save_edge["total_sample_size"] = (
+                                                sub_attribute["value"]
+                                            )
 
                         elif "biolink:supporting_data_source" in edge:
                             # from icees

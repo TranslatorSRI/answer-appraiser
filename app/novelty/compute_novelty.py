@@ -374,7 +374,7 @@ def novelty_score(fda_status, recency, similarity):
                 score = score * 0.85
     else:
         score = 0
-     
+
     return score
 
 
@@ -420,9 +420,11 @@ async def compute_novelty(message, logger):
         try:
             similarity_map = await molecular_sim(known, unknown, message)
             df["similarity"] = df.apply(
-                lambda row: similarity_map[row["drug"]][0][1]
-                if row["drug"] in similarity_map.keys()
-                else np.nan,
+                lambda row: (
+                    similarity_map[row["drug"]][0][1]
+                    if row["drug"] in similarity_map.keys()
+                    else np.nan
+                ),
                 axis=1,
             )
         except Exception as e:
@@ -433,11 +435,15 @@ async def compute_novelty(message, logger):
         # Step 3:
         # calculating the recency
         df["recency"] = df.apply(
-            lambda row: recency_function_exp(
-                row["number_of_publ"], row["age_oldest_pub"], 100, 50
-            )
-            if not (np.isnan(row["number_of_publ"]) or np.isnan(row["age_oldest_pub"]))
-            else np.nan,
+            lambda row: (
+                recency_function_exp(
+                    row["number_of_publ"], row["age_oldest_pub"], 100, 50
+                )
+                if not (
+                    np.isnan(row["number_of_publ"]) or np.isnan(row["age_oldest_pub"])
+                )
+                else np.nan
+            ),
             axis=1,
         )
         #
