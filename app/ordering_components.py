@@ -19,13 +19,13 @@ redis_pool = redis.ConnectionPool(
 def get_confidence(result, message, logger):
     """
     This function iterates through the answers from multiple ARAs,
-    It multiplies values of (1- score(ara[i])) for each ara 
+    It multiplies values of (1- score(ara[i])) for each ara
     Finally this product value is subtracted from 1
     """
     score_product = 1
     for analysis in result.get("analyses") or []:
         if analysis.get("score") is not None:
-            score_product = score_product * (1 -  analysis["score"])
+            score_product = score_product * (1 - analysis["score"])
     confidence_score = 1 - score_product
     return confidence_score
 
