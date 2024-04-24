@@ -21,11 +21,11 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="SRI Answer Appraiser",
-    version="0.4.0",
+    version="0.5.0",
     terms_of_service="",
     description="SRI service that provides metrics for scoring and ordering of results",
-    trapi="1.4.0",
-    biolink_version="3.4.2",
+    trapi="1.5.0",
+    biolink_version="4.2.0",
     contact={
         "name": "Max Wang",
         "email": "max@covar.com",
@@ -73,10 +73,12 @@ EXAMPLE = {
                 "MESH:D008687": {
                     "categories": ["biolink:SmallMolecule"],
                     "name": "Metformin",
+                    "attributes": [],
                 },
                 "MONDO:0005148": {
                     "categories": ["biolink:Disease"],
                     "name": "type 2 diabetes mellitus",
+                    "attributes": [],
                 },
             },
             "edges": {
@@ -90,17 +92,18 @@ EXAMPLE = {
                             "resource_role": "primary_knowledge_source",
                         }
                     ],
+                    "attributes": [],
                 }
             },
         },
         "results": [
             {
                 "node_bindings": {
-                    "n0": [{"id": "MESH:D008687"}],
-                    "n1": [{"id": "MONDO:0005148"}],
+                    "n0": [{"id": "MESH:D008687", "attributes": []}],
+                    "n1": [{"id": "MONDO:0005148", "attributes": []}],
                 },
                 "analyses": [
-                    {"resource_id": "kp0", "edge_bindings": {"n0n1": [{"id": "n0n1"}]}}
+                    {"resource_id": "kp0", "edge_bindings": {"n0n1": [{"id": "n0n1", "attributes": []}]}}
                 ],
             }
         ],

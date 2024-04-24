@@ -4,7 +4,7 @@ httpx==0.24.1
 numpy==1.25.1
 pandas==2.0.3
 rdkit==2023.3.2
-reasoner-pydantic==4.0.8
+reasoner-pydantic==5.0.2
 redis==4.6.0
 tqdm==4.65.0
 uvicorn==0.13.3
