@@ -103,7 +103,10 @@ EXAMPLE = {
                     "n1": [{"id": "MONDO:0005148", "attributes": []}],
                 },
                 "analyses": [
-                    {"resource_id": "kp0", "edge_bindings": {"n0n1": [{"id": "n0n1", "attributes": []}]}}
+                    {
+                        "resource_id": "kp0",
+                        "edge_bindings": {"n0n1": [{"id": "n0n1", "attributes": []}]},
+                    }
                 ],
             }
         ],
