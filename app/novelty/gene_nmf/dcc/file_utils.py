@@ -50,7 +50,7 @@ def read_tab_delimited_file(file_path, log=False):
     result = {}
 
     # read in the data
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         for line in file:
             fields = line.strip().split('\t')
             stripped_list = [item.strip() for item in fields]
