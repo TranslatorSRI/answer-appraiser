@@ -143,3 +143,23 @@ def test_get_gene_nmf_novelty_for_gene_list():
     assert len(map_result.get('gene_results')) == len(list_gene_test)
 
 
+
+def test_get_gene_nmf_novelty_for_gene_list_and_pvalue():
+    """
+    Test that the gene nmf adaptare novelty function works.
+    """
+    # initialize
+    map_result = {}
+
+    # call method
+    map_result = adapter.get_gene_nmf_novelty_for_gene_list(list_input_genes=list_gene_test, p_value_cutoff=0.2, log=True)
+
+    # logger
+    logger.info("got map result of size: {}".format(len(map_result.get('gene_results'))))
+
+    # test
+    assert map_result is not None
+    assert map_result.get('gene_results') is not None
+    assert len(map_result.get('gene_results')) > 0
+    assert len(map_result.get('gene_results')) == len(list_gene_test)
+

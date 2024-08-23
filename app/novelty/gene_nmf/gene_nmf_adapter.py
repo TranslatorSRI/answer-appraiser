@@ -77,14 +77,14 @@ print("================ Bayes NMF data structures LOADED! ======================
 
 
 # methods
-def get_gene_nmf_novelty_for_gene_list(list_input_genes, log=False):
+def get_gene_nmf_novelty_for_gene_list(list_input_genes, p_value_cutoff=P_VALUE_CUTOFF, log=False):
     '''
     'will process the gene nmf call for the gene list given and return the gene novelty
     '''
     map_result = {}
 
     # get the calculated data
-    map_gene_novelty, list_input_translated = process_genes(list_input_genes=list_input_genes)
+    map_gene_novelty, list_input_translated = process_genes(list_input_genes=list_input_genes, p_value_cutoff=p_value_cutoff)
 
     # log result
     logger.info("got novelty result map of size: {}".format(len(map_gene_novelty)))
@@ -97,7 +97,7 @@ def get_gene_nmf_novelty_for_gene_list(list_input_genes, log=False):
     return map_result
 
 
-def process_genes(list_input_genes, log=False):
+def process_genes(list_input_genes, p_value_cutoff, log=False):
     '''
     processes the input genes
     '''
@@ -112,7 +112,7 @@ def process_genes(list_input_genes, log=False):
 
     # do the calculations
     list_factor, list_factor_genes, list_factor_gene_sets, gene_factor, gene_set_factor, map_gene_novelty = cutils.calculate_factors(matrix_gene_sets_gene_original=matrix_gene_sets, 
-                                                                                                               p_value=P_VALUE_CUTOFF,
+                                                                                                               p_value=p_value_cutoff,
                                                                                                                list_gene=list_input_translated, 
                                                                                                                list_system_genes=list_system_genes, 
                                                                                                                map_gene_index=map_gene_index, map_gene_set_index=map_gene_set_index,
