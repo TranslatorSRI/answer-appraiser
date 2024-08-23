@@ -43,26 +43,28 @@ def find_nearest_neighbors(
     for unknownkey, value in unknown_smiles.items():
         query_mol = Chem.MolFromSmiles(value)
         if query_mol is None:
-            raise ValueError("Invalid SMILES string")
+            neighbors = []
+            neighbors.append((0, 1))
+            nearest_neighbor_mapping.update({unknownkey: neighbors})
+        else:
+            # Calculate fingerprints for the query molecule
+            query_fp = AllChem.GetMorganFingerprint(query_mol, 2)
 
-        # Calculate fingerprints for the query molecule
-        query_fp = AllChem.GetMorganFingerprint(query_mol, 2)
+            # Calculate similarity scores between the query molecule and all molecules in the dataset
+            similarities = []
+            for key, mol in known_mols.items():
+                fp = AllChem.GetMorganFingerprint(mol, 2)
+                similarity = DataStructs.TanimotoSimilarity(query_fp, fp)
+                similarities.append((key, similarity))
 
-        # Calculate similarity scores between the query molecule and all molecules in the dataset
-        similarities = []
-        for key, mol in known_mols.items():
-            fp = AllChem.GetMorganFingerprint(mol, 2)
-            similarity = DataStructs.TanimotoSimilarity(query_fp, fp)
-            similarities.append((key, similarity))
+            # Sort the similarities in descending order
+            similarities.sort(key=lambda x: x[1], reverse=True)
 
-        # Sort the similarities in descending order
-        similarities.sort(key=lambda x: x[1], reverse=True)
-
-        # Retrieve the nearest neighbors
-        neighbors = []
-        for i in range(min(num_neighbors, len(similarities))):
-            index, similarity = similarities[i]
-            if similarity >= similarity_cutoff:
-                neighbors.append((index, similarity))
-        nearest_neighbor_mapping.update({unknownkey: neighbors})
+            # Retrieve the nearest neighbors
+            neighbors = []
+            for i in range(min(num_neighbors, len(similarities))):
+                index, similarity = similarities[i]
+                if similarity >= similarity_cutoff:
+                    neighbors.append((index, similarity))
+            nearest_neighbor_mapping.update({unknownkey: neighbors})
     return nearest_neighbor_mapping
