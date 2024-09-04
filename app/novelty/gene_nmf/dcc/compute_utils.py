@@ -213,6 +213,9 @@ def compute_beta_tildes(X, Y, scale_factors, mean_shifts, y_var=1, resid_correla
         len_Y = Y.shape[0]
         Y = Y - np.mean(Y)
 
+    # BUG - fixed y_var wrong setting
+    y_var = np.var(Y, axis=1)
+    
     dot_product = np.array(X.T.dot(Y.T) / len_Y).T
 
     variances = np.power(scale_factors, 2)
@@ -706,11 +709,15 @@ def filter_matrix_columns(matrix_input, vector_input, cutoff_input, max_num_gene
     if len(selected_column_indices) > max_num_gene_sets:
         # log
         if log:
-            logger.info("filtered gene sets of size: {} is larger than the max: {}, so taking top {}".format(len(selected_column_indices), max_num_gene_sets, max_num_gene_sets))
+            logger.info("filtered gene sets of size: {} is LARGER than the max: {}, so taking top {}".format(len(selected_column_indices), max_num_gene_sets, max_num_gene_sets))
 
         # Get the indices of the n lowest values
         min_values = np.min(vector_input, axis=0)
         selected_column_indices = np.argsort(min_values)[:max_num_gene_sets]
+    else:
+        if log:
+            logger.info("filtered gene sets of size: {} is SMALLER than the max: {}, so keep the result as is".format(len(selected_column_indices), max_num_gene_sets))
+
 
     # filter the reference gene/gene sets matrix down
     matrix_result = matrix_input[:, selected_column_indices]
