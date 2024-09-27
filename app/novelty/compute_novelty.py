@@ -4,15 +4,13 @@ import httpx
 import numpy as np
 import traceback
 import json
-from known import find_known_results
-from extr_smile_molpro_by_id import mol_to_smile_molpro
-from mol_similarity import find_nearest_neighbors
+from rdkit import Chem
+from rdkit import DataStructs
+from rdkit.Chem import AllChem
 import os, sys
 import time
 import asyncio
 import requests
-#from Bio import Entrez
-#Entrez.email = 'pg427@drexel.edu'
 
 startup_utils_path = os.path.abspath("app/novelty/gene_nmf_adapter.py")
 startup_utils_dir = os.path.dirname(startup_utils_path)
@@ -36,6 +34,128 @@ The steps for the ideal workflow are as follows:
 The end result of this script displays a table with values from different columns and accordingly lists the novelty score as well.
 """
 
+def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_cutoff, num_neighbors):
+    """
+
+    Returns:
+        Dict
+
+    Args:
+        unknown_smiles_dict: Dict
+        known_smiles_dict: Dict
+        similarity_cutoff: float: 0
+        num_neighbors: int: 1
+
+    """
+    unknown_smiles = {
+        key: value
+        for key, value in unknown_smiles_dict.items()
+        if value != "No SMILES could be found"
+    }
+    known_smiles = {
+        key: value
+        for key, value in known_smiles_dict.items()
+        if value != "No SMILES could be found"
+    }
+
+    # Convert input SMILES to a molecule
+    known_mols = {}
+    for key, value in known_smiles.items():
+        known_mol = Chem.MolFromSmiles(value)
+        if known_mol is not None:
+            known_mols.update({key: known_mol})
+        # else:
+        #     known_mols.update({key: known_mol})
+    nearest_neighbor_mapping = {}
+    for unknownkey, value in unknown_smiles.items():
+        query_mol = Chem.MolFromSmiles(value)
+        if query_mol is None:
+            neighbors = []
+            neighbors.append((0, 1))
+            nearest_neighbor_mapping.update({unknownkey: neighbors})
+        else:
+            # Calculate fingerprints for the query molecule
+            query_fp = AllChem.GetMorganFingerprint(query_mol, 2)
+
+            # Calculate similarity scores between the query molecule and all molecules in the dataset
+            similarities = []
+            for key, mol in known_mols.items():
+                fp = AllChem.GetMorganFingerprint(mol, 2)
+                similarity = DataStructs.TanimotoSimilarity(query_fp, fp)
+                similarities.append((key, similarity))
+
+            # Sort the similarities in descending order
+            similarities.sort(key=lambda x: x[1], reverse=True)
+
+            # Retrieve the nearest neighbors
+            neighbors = []
+            for i in range(min(num_neighbors, len(similarities))):
+                index, similarity = similarities[i]
+                if similarity >= similarity_cutoff:
+                    neighbors.append((index, similarity))
+            nearest_neighbor_mapping.update({unknownkey: neighbors})
+    return nearest_neighbor_mapping
+
+async def mol_to_smile_molpro(molecules):
+    """
+    Args:
+        List
+
+    Returns:
+        Dict
+
+    """
+
+    url = "https://molepro.transltr.io/molecular_data_provider/compound/by_id"
+    headers = {"accept": "application/json", "Content-Type": "application/json"}
+
+    smiles = {}
+
+    data_mol = list(set(molecules))
+    # async with httpx.AsyncClient(timeout=30) as client:
+    try:
+        while data_mol:
+            data_mol_before = len(data_mol)
+            response = requests.post(url, headers=headers, json=data_mol)
+            if response.status_code == 200:
+                json_response = response.json()
+                collec_url = json_response["url"]
+                temp_collec_response = requests.get(collec_url, timeout=1)
+                if temp_collec_response.status_code == 200:
+                    collec_response = temp_collec_response.json()
+
+                    for i in range(json_response["size"]):
+                        key_list = ["identifiers"]
+                        if set(key_list).issubset(collec_response["elements"][i].keys()):
+                            identifiers = collec_response["elements"][i]["identifiers"]
+                            smile = identifiers.get(
+                                "smiles", "No SMILES could be found"
+                            )
+                            smiles[data_mol[i]] = smile
+                        else:
+                            smiles[data_mol[i]] = "No identifiers could be found"
+
+                    # Remove molecules with successfully retrieved smiles from data_mol
+                    data_mol = [mol for mol in data_mol if mol not in smiles]
+                    data_mol_after = len(data_mol)
+                    # print(f'after: {len(data_mol)}')
+
+                    if data_mol_after == data_mol_before:
+                        break
+
+                else:
+                    print(
+                        f"Error: {temp_collec_response.status_code} - {temp_collec_response.text}"
+                    )
+                    break
+            else:
+                print(f"Error: {response.status_code} - {response.text}")
+                break
+    except Exception as e:
+        for idx, i in enumerate(data_mol):
+            smiles[i] = "No identifiers could be found"
+
+    return smiles
 
 async def molecular_sim(known, unknown, message, query_id):
     unknown_ids = []
@@ -111,7 +231,6 @@ def get_publication_info(pub_id):
 def sigmoid(x):
     return 1 / (1 + np.exp(x))
 
-
 def query_id(message):
     for i in message["query_graph"]["nodes"]:
         if "ids" in message["query_graph"]["nodes"][i].keys():
@@ -130,7 +249,6 @@ def query_id(message):
     else:
         chk = 0
     return known_node, unknown_node, chk
-
 
 def recency_function_exp(number_of_publ, age_of_oldest_publ, max_number, max_age):
     """
@@ -227,167 +345,6 @@ def extracting_publications(message, result):
                             break
     return publications
 
-
-async def extracting_drug_fda_publ_date(message, unknown):
-    """
-    Upon querying, the response is returned as a list containing 10 dictionaries,
-    with each dictionary representing the response from an ARA. The function 'extracting_drug_fda_publ_date'
-    is designed to extract the drug entity name of each edge. It then checks the EPC attributes of each edge
-    to determine the FDA approval status of the drug and the accociated pulications PMID/PMC ID ... .
-    And finally extract the publishing date of the publications to get the oldest (Year) date among them.
-
-    Args:
-        Dictionary: response for a ARA to a query
-
-    Returns:
-        "An DataFrame constructed where each row represents an edge and contains information such as the drug entity
-        name, FDA status of the drug, a list of associated publications, the number of associated publications,
-        and the oldest publication date (year) linked to each drug."
-
-    """
-    attribute_type_id_list_fda = [
-        "biolink:FDA_approval_status",
-        "biolink:FDA_APPROVAL_STATUS",
-    ]
-    attribute_type_id_list_pub = [
-        "biolink:publications",
-        "biolink:Publication",
-        "biolink:publication",
-    ]
-    drug_idx_fda_status = []
-    today = date.today()
-
-    query_known, query_unknown, query_chk = query_id(message)
-    idi = -1
-    for tmp in unknown:
-        tmp_res = message["results"][tmp]["analyses"][0]["edge_bindings"]
-        for tmp_1 in tmp_res:
-            idi += 1
-            edge_id = message["results"][tmp]["analyses"][0]["edge_bindings"][tmp_1][0][
-                "id"
-            ]
-            edge = message["knowledge_graph"]["edges"][edge_id]
-            if query_chk == 1:
-                if (
-                    "PUBCHEM" in edge["subject"]
-                    or "CHEMBL" in edge["subject"]
-                    or "UNII" in edge["subject"]
-                    or "RXNORM" in edge["subject"]
-                    or "UMLS" in edge["subject"]
-                    or not "MONDO" in edge["subject"]
-                ):
-                    drug_idx = edge["subject"]
-                else:
-                    drug_idx = edge["object"]
-                edge_attributes = edge.get("attributes") or []
-                if len(edge_attributes) > 0:
-                    att_type_id = {}
-                    fda = []
-                    pub = []
-                    for i in range(len(edge_attributes)):
-                        att_type_id[i] = edge_attributes[i]["attribute_type_id"]
-
-                    for key in att_type_id.keys():
-                        if att_type_id[key] in attribute_type_id_list_fda:
-                            fda.append(key)
-                        elif att_type_id[key] in attribute_type_id_list_pub:
-                            pub.append(key)
-
-                    if len(fda) > 0:
-                        if edge_attributes[fda[0]]["value"] == "FDA Approval":
-                            fda_status = 0.0
-                        else:
-                            fda_status = 1.0
-                    else:
-                        fda_status = None
-
-                    # Publication
-                    if len(pub) > 0:
-                        publications = edge_attributes[pub[0]]["value"]
-                        if "|" in publications:
-                            publications = publications.split("|")
-                        if type(publications) == "str":
-                            publications = [publications]
-
-                        # Removal of all publication entries that are links
-                        publications = [x for x in publications if "http" not in x]
-                        # Removal of all publication entries that are Clinical Trials
-                        publications = [
-                            x for x in publications if "clinicaltrials" not in x
-                        ]
-                        number_of_publ = len(publications)
-
-                        if len(publications) > 0:
-                            # print(publications)
-                            publications_1 = ",".join(publications)
-                            try:
-                                response_pub = await get_publication_info(
-                                    publications_1
-                                )
-                                if response_pub["_meta"]["n_results"] == 0:
-                                    age_oldest = np.nan
-                                else:
-                                    publ_year = []
-                                    for key in response_pub["results"].keys():
-                                        if "not_found" not in key:
-                                            publ_year.extend(
-                                                [
-                                                    int(
-                                                        response_pub["results"][key][
-                                                            "pub_year"
-                                                        ]
-                                                    )
-                                                ]
-                                            )
-                                    age_oldest = today.year - min(publ_year)
-                            except ConnectionError as e:
-                                age_oldest = np.nan
-                    else:
-                        publications = None
-                        number_of_publ = 0.0
-                        age_oldest = np.nan
-                    drug_idx_fda_status.append(
-                        (
-                            idi,
-                            drug_idx,
-                            fda_status,
-                            publications,
-                            number_of_publ,
-                            age_oldest,
-                        )
-                    )
-            else:
-                if query_unknown in ["biolink:Gene", "biolink:Protein"]:
-                    if "NCBI" in edge["subject"] or "GO" in edge["subject"]:
-                        gene_idx = edge["subject"]
-                    else:
-                        gene_idx = edge["object"]
-                    drug_idx_fda_status.append((idi, gene_idx))
-                elif query_unknown in ["biolink:Disease", "biolink:Phenotype"]:
-                    if "MONDO" in edge["subject"]:
-                        dis_idx = edge["subject"]
-                    else:
-                        dis_idx = edge["object"]
-                    drug_idx_fda_status.append((idi, dis_idx))
-    if query_unknown == "biolink:SmallMolecule" or query_unknown == "biolink:ChemicalEntity" or query_unknown == "biolink:Drug":
-        DF = pd.DataFrame(
-            drug_idx_fda_status,
-            columns=[
-                "edge",
-                "drug",
-                "fda status",
-                "publications",
-                "number_of_publ",
-                "age_oldest_pub",
-            ],
-        )
-    elif query_unknown == "biolink:Gene":
-        DF = pd.DataFrame(drug_idx_fda_status, columns=["edge", "gene"])
-    else:
-        DF = pd.DataFrame()
-    return DF, query_chk
-
-
 def extract_results(message, unknown, known):
     results = []
     results_known = []
@@ -412,7 +369,6 @@ def extract_results(message, unknown, known):
             kid += 1
     return results, results_known
 
-
 def result_edge_correlation(results, results_known, df):
     df_res = pd.DataFrame()
     res_known = set()
@@ -426,139 +382,6 @@ def result_edge_correlation(results, results_known, df):
         for j in i:
             res_known.add(df.loc[df["edge"] == j, "drug"].iloc[0])
     return df_res, res_unknown, res_known
-
-
-def novelty_score(fda_status, recency, similarity):
-    """
-    Calculate the novelty score for each drug entity based on FDA status, recency and similarity of the drug.
-
-    FDA status 0 | 1
-        --> 0 to be FDA approved
-    0 < recency < 1
-        --> 1 to have a high recency where the publications are so new and number of publications is too few.
-    0 < similarity < 1
-        --> 0 to have a very low molecular structure similarity, so it is novel.
-
-    Args:
-        float: fda_status
-        float: recency
-        float: similarity
-
-    Returns:
-        float: novelty_score
-
-    """
-    if not np.isnan(recency):
-        score = recency
-        if not np.isnan(similarity):
-            similarity = 1 - similarity
-            if similarity > 0.5:
-                score = score * (0.73 + similarity)
-            if score > 1:
-                score = 1
-            if fda_status == 0:
-                score = score * 0.85
-    else:
-        score = 0
-
-    return score
-
-def clinical_trials_kp(message):
-    """
-    For every result, check the clinical approval and clinical trials information in the result's nodes attributes
-    in association with that disease
-    """
-    for i in message['query_graph']['nodes']:
-        if 'ids' in message['query_graph']['nodes'][i].keys():
-            query_id_node = message['query_graph']['nodes'][i]['ids'][0]
-            break
-    result_clinical_info = []
-    for idi, i in enumerate(message['results']):
-        node_binding_keys = list(i['node_bindings'].keys())
-        if i['node_bindings'][node_binding_keys[0]][0]['id'] == query_id_node:
-            result_id_node = i['node_bindings'][node_binding_keys[1]][0]['id']
-        else:
-            result_id_node = i['node_bindings'][node_binding_keys[0]][0]['id']
-        if message['knowledge_graph']['nodes'][result_id_node]['attributes']==[]:
-            result_clinical_info.append([idi, result_id_node, "No clinical information"])
-        else:
-            att_found, found = 0, 0
-            for chk in message['knowledge_graph']['nodes'][result_id_node]['attributes']:
-                if chk['attribute_type_id'] == "biothings_annotations":
-                    att_found = 1
-                    break
-            if att_found==1:
-                attribute_chk = chk['value'][0].keys()
-                if 'clinical_approval' in attribute_chk:
-                    clinical_approval_list = chk['value'][0]['clinical_approval']
-                    for idj, j in enumerate(clinical_approval_list):
-                        clinical_app_key = list(j['disease'].keys())[0]
-                        if j['disease'][clinical_app_key] == query_id_node:
-                            found=1
-                            result_clinical_info.append([idi, result_id_node, j['status']])
-                            break
-
-                if found==0:
-                    if 'clinical_trials' in attribute_chk:
-                        clinical_trials_list = chk['value'][0]['clinical_trials']
-                        phase_trials = []
-                        for idj, j in enumerate(clinical_trials_list):
-                            clinical_app_key = list(j[0]['disease'].keys())[0]
-                            if j[0]['disease'][clinical_app_key]==query_id_node:
-                                for k in j:
-                                    phase_trials.append(k['phase'])
-                        if len(phase_trials)>0:
-                            if len(phase_trials) > 1:
-                                phase_trials.sort(reverse=True)
-                                result_clinical_info.append([idi, result_id_node, phase_trials[0]])
-                            else:
-                                result_clinical_info.append([idi, result_id_node, phase_trials])
-                            found=1
-
-                if found==0:
-                    result_clinical_info.append([idi, result_id_node, "No clinical information"])
-
-            else:
-                result_clinical_info.append([idi, result_id_node, "No clinical information"])
-
-    return result_clinical_info
-
-def tdls(message):
-    """
-        For every result, check the TDLs information in the result's nodes attributes
-    """
-    for i in message['query_graph']['nodes']:
-        if 'ids' in message['query_graph']['nodes'][i].keys():
-            query_id_node = message['query_graph']['nodes'][i]['ids'][0]
-            break
-    result_tdl_info = []
-    for idi, i in enumerate(message['results']):
-        node_binding_keys = list(i['node_bindings'].keys())
-        if i['node_bindings'][node_binding_keys[0]][0]['id'] == query_id_node:
-            result_id_node = i['node_bindings'][node_binding_keys[1]][0]['id']
-        else:
-            result_id_node = i['node_bindings'][node_binding_keys[0]][0]['id']
-        if message['knowledge_graph']['nodes'][result_id_node]['attributes'] == []:
-            result_tdl_info.append([idi, result_id_node, "No TDLs information"])
-        else:
-            att_found, found = 0, 0
-            for chk in message['knowledge_graph']['nodes'][result_id_node]['attributes']:
-                if chk['attribute_type_id'] == "biothings_annotations":
-                    att_found = 1
-                    break
-            if att_found == 1:
-                attribute_chk = chk['value'][0].keys()
-                if 'pharos' in attribute_chk:
-                    tdl = chk['value'][0]['pharos']['tdl']
-                    result_tdl_info.append([idi, result_id_node, tdl])
-                    found=1
-                if found == 0:
-                    result_tdl_info.append([idi, result_id_node, "No TDLs information"])
-
-            else:
-                result_tdl_info.append([idi, result_id_node, "No TDLs information"])
-
-    return result_tdl_info
 
 async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec_clin = 0.3, wt_md = 0.7):
     """
