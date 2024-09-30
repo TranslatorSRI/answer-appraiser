@@ -19,10 +19,6 @@ print("added to python path the following directory: {}".format(startup_utils_di
 import gene_nmf_adapter as adapter
 import dcc.dcc_utils as dutils
 
-# logger = dutils.get_logger(name=__name__)
-# logger.info("added to pyton path the following directory: {}".format(startup_utils_dir))
-# # print("added to python path the following directory: {}".format(startup_utils_dir))
-
 """
 This script computes the novelty score for a list of results obtained for a 1-H response.
 The steps for the ideal workflow are as follows:
@@ -167,20 +163,6 @@ async def molecular_sim(known, unknown, message, query_id):
                 unknown_ids.append(message["results"][drug]['node_bindings'][s[1]][0]['id'])
             else:
                 unknown_ids.append(message["results"][drug]['node_bindings'][s[0]][0]['id'])
-            # edge_attribute_sn = message["results"][drug]["node_bindings"][s[0]][0]["id"]
-            # if (
-            #     "PUBCHEM" in edge_attribute_sn
-            #     or "CHEMBL" in edge_attribute_sn
-            #     or "UNII" in edge_attribute_sn
-            #     or "RXNORM" in edge_attribute_sn
-            #     or "UMLS" in edge_attribute_sn
-            #     or not "MONDO" in edge_attribute_sn
-            # ):
-            #     unknown_ids.append(edge_attribute_sn)
-            # else:
-            #     unknown_ids.append(
-            #         message["results"][drug]["node_bindings"][s[1]][0]["id"]
-            #     )
 
     if len(known) > 0:
         for drug in known:
@@ -189,20 +171,7 @@ async def molecular_sim(known, unknown, message, query_id):
                 known_ids.append(message["results"][drug]['node_bindings'][s[1]][0]['id'])
             else:
                 known_ids.append(message["results"][drug]['node_bindings'][s[0]][0]['id'])
-            # edge_attribute_sn = message["results"][drug]["node_bindings"][s[0]][0]["id"]
-            # if (
-            #     "PUBCHEM" in edge_attribute_sn
-            #     or "CHEMBL" in edge_attribute_sn
-            #     or "UMLS" in edge_attribute_sn
-            #     or "UNII" in edge_attribute_sn
-            #     or "RXNORM" in edge_attribute_sn
-            #     or not "MONDO" in edge_attribute_sn
-            # ):
-            #     known_ids.append(edge_attribute_sn)
-            # else:
-            #     known_ids.append(
-            #         message["results"][drug]["node_bindings"][s[1]][0]["id"]
-            #     )
+
     smile_unkown = await mol_to_smile_molpro(unknown_ids)
     smile_known = await mol_to_smile_molpro(known_ids)
     similarity_map = find_nearest_neighbors(smile_unkown, smile_known, 0, 1)
@@ -394,7 +363,6 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
 
     query_keys = list(message['query_graph']['nodes'].keys())
     if 'ids' in message['query_graph']['nodes'][query_keys[0]].keys():
-        # print(message['query_graph']['nodes'][query_keys[0]]['ids'])
         if message['query_graph']['nodes'][query_keys[0]]['ids'] != None:
             query_id_node = message['query_graph']['nodes'][query_keys[0]]['ids'][0]
             result_id_cat = message['query_graph']['nodes'][query_keys[1]]['categories'][0]
@@ -413,9 +381,7 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
         novelty_score_rec = []
         novelty_score_gd, novelty_score_md = [], []
         novelty_score_rec_tdl, novelty_score_rec_clin = [], []
-        # print(len(message['results']))
         for idi, i in enumerate(message['results']):
-            # print(idi)
             curated=0
             node_binding_keys = list(i['node_bindings'].keys())
             if i['node_bindings'][node_binding_keys[0]][0]['id'] == query_id_node:
@@ -494,7 +460,6 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
                             age_oldest = today.year - min(publ_year)
                     except ConnectionError as e:
                         age_oldest = np.nan
-                    # print(age_oldest)
                     if not np.isnan(age_oldest):
                         recency_val = recency_function_exp(number_of_publ, age_oldest, 100, 50)
                         df_numpy[idi].extend([recency_val])
@@ -682,16 +647,3 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
         df_numpy = pd.DataFrame([["NAN"]*len(column_list)]*len(message['results']), columns = column_list)
 
     return df_numpy
-
-# directory = "novelty_benchmarks_pk_responses/"
-# json_files = [json_file for json_file in os.listdir(os.getcwd()) if json_file.endswith('.json')]
-# for i in json_files:
-#     print(i)
-#     if f"{i.rstrip('.json')}_novelty_results.csv" not in os.listdir(os.getcwd()):
-#         message = json.load(open(directory+i))['fields']['data']['message']
-#         print(json.load(open(directory+i))['fields']['status'])
-#         if json.load(open(directory+i))['fields']['status'] == "Done":
-#             df = asyncio.run(compute_novelty(message, None))
-#             df.to_csv(f"{i.rstrip('.json')}_novelty_results.csv", index=False)
-#         else:
-#             print(json.load(open(directory+i))['fields']['status'])
