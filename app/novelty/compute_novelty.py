@@ -644,6 +644,6 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
         elif result_id_cat in ["biolink:Protein", "biolink:Gene"]:
             column_list = ['Query ID', 'Result ID', 'Location 1', 'Location 2', 'Curated or not ?', 'Recency Score',
                            'Gene Distinctiveness', 'TDLs', 'novelty_score']
-        df_numpy = pd.DataFrame([["NAN"]*len(column_list)]*len(message['results']), columns = column_list)
+        df_numpy = pd.DataFrame([[0]*len(column_list)]*len(message['results']), columns = column_list)
 
     return df_numpy
