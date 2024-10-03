@@ -21,7 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="SRI Answer Appraiser",
-    version="0.5.1",
+    version="0.6.0",
     terms_of_service="",
     description="SRI service that provides metrics for scoring and ordering of results",
     trapi="1.5.0",
@@ -164,14 +164,14 @@ async def get_appraisal(
     )
 
 
-@APP.post("/get_appraisal", response_model=Response)
-async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
+@APP.post("/get_appraisal")
+async def sync_get_appraisal(query=Body(..., example=EXAMPLE)):
     qid = str(uuid4())[:8]
-    query_dict = query.dict()
-    log_level = query_dict.get("log_level") or "INFO"
+    # query_dict = query.dict()
+    log_level = query.get("log_level") or "INFO"
     logger = get_logger(qid, log_level)
     logger.info("Starting sync appraisal")
-    message = query_dict["message"]
+    message = query["message"]
     if not message.get("results"):
         return JSONResponse(
             content={"status": "Rejected", "description": "No Results.", "job_id": qid},
@@ -182,7 +182,7 @@ async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
     logger.info("Done appraising")
-    return Response(message=message)
+    return query
 
 
 @APP.get("/redis_ready")
