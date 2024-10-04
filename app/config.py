@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_password: str = "supersecretpassword"
 
+    jaeger_enabled: str = "True"
+    jaeger_host: str = "jaeger"
+    jaeger_port: int = 6831
+
     class Config:
         env_file = ".env"
 
