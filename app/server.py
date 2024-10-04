@@ -113,56 +113,6 @@ EXAMPLE = {
     }
 }
 
-ASYNC_EXAMPLE = {
-    "callback": "http://test",
-    **EXAMPLE,
-}
-
-
-async def async_appraise(message, callback, logger: logging.Logger):
-    try:
-        await get_ordering_components(message, logger)
-    except Exception:
-        logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
-    logger.info("Done appraising")
-    try:
-        logger.info(f"Posting to callback {callback}")
-        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=600.0)) as client:
-            res = await client.post(callback, json=message)
-            logger.info(f"Posted to {callback} with code {res.status_code}")
-    except Exception as e:
-        logger.error(f"Unable to post to callback {callback}.")
-
-
-@APP.post("/async_get_appraisal", response_model=AsyncQueryResponse)
-async def get_appraisal(
-    background_tasks: BackgroundTasks,
-    query: AsyncQuery = Body(..., example=ASYNC_EXAMPLE),
-):
-    """Appraise Answers"""
-    qid = str(uuid4())[:8]
-    query_dict = query.dict()
-    log_level = query_dict.get("log_level") or "INFO"
-    logger = get_logger(qid, log_level)
-    logger.info("Starting async appraisal")
-    message = query_dict["message"]
-    if not message.get("results"):
-        logger.warning("No results given.")
-        return JSONResponse(
-            content={"status": "Rejected", "description": "No Results.", "job_id": qid},
-            status_code=400,
-        )
-    callback = query_dict["callback"]
-    background_tasks.add_task(async_appraise, message, callback, logger)
-    return JSONResponse(
-        content={
-            "status": "Accepted",
-            "description": f"Appraising answers. Will send response to {callback}",
-            "job_id": qid,
-        },
-        status_code=200,
-    )
-
 
 @APP.post("/get_appraisal")
 async def sync_get_appraisal(query=Body(..., example=EXAMPLE)):
