@@ -1,14 +1,13 @@
+import gzip
+import json
 import logging
 import redis
 import traceback
 
-from fastapi import Body, BackgroundTasks, HTTPException, status
-from fastapi.responses import JSONResponse
-import httpx
+from fastapi import HTTPException, status, Request
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.cors import CORSMiddleware
 from uuid import uuid4
-
-from reasoner_pydantic import AsyncQuery, AsyncQueryResponse, Response, Query
 
 from .config import settings
 from .logger import setup_logger, get_logger
@@ -115,12 +114,25 @@ EXAMPLE = {
 
 
 @APP.post("/get_appraisal")
-async def sync_get_appraisal(query=Body(..., example=EXAMPLE)):
+async def sync_get_appraisal(request: Request):
     qid = str(uuid4())[:8]
-    # query_dict = query.dict()
-    log_level = query.get("log_level") or "INFO"
-    logger = get_logger(qid, log_level)
+    logger = get_logger(qid, "INFO")
     logger.info("Starting sync appraisal")
+    compressed = False
+    if request.headers.get("content-encoding") == "gzip":
+        try:
+            raw_body = await request.body()
+            query = json.loads(gzip.decompress(raw_body))
+            compressed = True
+        except Exception:
+            return Response("Invalid request. Failed to decompress and ingest.", 400)
+    else:
+        try:
+            query = await request.json()
+        except json.JSONDecodeError:
+            return Response("Invalid request. Failed to parse JSON.", 400)
+    log_level = query.get("log_level") or "INFO"
+    logger.setLevel(log_level)
     message = query["message"]
     if not message.get("results"):
         return JSONResponse(
@@ -131,8 +143,12 @@ async def sync_get_appraisal(query=Body(..., example=EXAMPLE)):
         await get_ordering_components(message, logger)
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
+    if compressed:
+        query = gzip.compress(json.dumps(query).encode())
+    else:
+        query = json.dumps(query)
     logger.info("Done appraising")
-    return query
+    return Response(query)
 
 
 @APP.get("/redis_ready")
