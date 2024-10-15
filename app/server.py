@@ -84,7 +84,7 @@ if settings.jaeger_enabled == "True":
     provider.add_span_processor(processor)
     trace.set_tracer_provider(provider)
     FastAPIInstrumentor.instrument_app(
-        APP, tracer_provider=provider, excluded_urls="docs,openapi.json"
+        APP, tracer_provider=provider, excluded_urls="docs,openapi.json,redis_ready"
     )
     HTTPXClientInstrumentor().instrument()
 
