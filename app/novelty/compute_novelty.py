@@ -11,6 +11,7 @@ import os, sys
 import time
 import asyncio
 import requests
+import redis
 
 startup_utils_path = os.path.abspath("app/novelty/gene_nmf_adapter.py")
 startup_utils_dir = os.path.dirname(startup_utils_path)
@@ -182,20 +183,15 @@ def get_publication_info(pub_id):
     Args: PMID
     Returns: The publication info
     """
-    base_url = "https://docmetadata.ci.transltr.io/publications?pubids="
-    request_id = "1234"
-    full_url = f"{base_url}{pub_id}&request_id={request_id}"
-    try:
-        response = requests.get(full_url, timeout=5)
-        response.raise_for_status()
-        response = response.json()
-    except Exception:
-        response = {
-            "_meta": {
-                "n_results": 0,
-            },
-        }
-    return response
+
+    # Connect to Redis
+    r = redis.Redis(host='localhost', port=6379, db=0)
+    pmid_years = []
+    for key in pub_id:
+        val = r.get(key)
+        if val:
+            pmid_years.append(int(val))
+    return pmid_years
 
 def sigmoid(x):
     return 1 / (1 + np.exp(x))
@@ -437,26 +433,15 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
             else:
                 number_of_publ = len(publications)
                 if number_of_publ!=0:
-                    publications_1 = ",".join(publications)
+                    # publications_1 = ",".join(publications)
                     try:
                         response_pub = get_publication_info(
-                            publications_1
+                            publications
                         )
-                        if response_pub["_meta"]["n_results"] == 0:
+                        if not response_pub:
                             age_oldest = np.nan
                         else:
-                            publ_year = []
-                            for key in response_pub["results"].keys():
-                                if "not_found" not in key:
-                                    publ_year.extend(
-                                        [
-                                            int(
-                                                response_pub["results"][key][
-                                                    "pub_year"
-                                                ]
-                                            )
-                                        ]
-                                    )
+                            publ_year = response_pub
                             age_oldest = today.year - min(publ_year)
                     except ConnectionError as e:
                         age_oldest = np.nan
@@ -647,3 +632,13 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
         df_numpy = pd.DataFrame([[0]*len(column_list)]*len(message['results']), columns = column_list)
 
     return df_numpy
+
+filename = 'e2ed43f8-b2c7-4f0e-9eb8-169bdca50444.json'
+# filename = "7aa4575e-8f98-47fe-931a-85bd6178ed46.json"
+message = json.load(open(filename))['fields']['data']['message']
+print(json.load(open(filename))['fields']['status'])
+if json.load(open(filename))['fields']['status'] == "Done":
+   df = asyncio.run(compute_novelty(message, None))
+   df.to_csv(f"{filename.rstrip('.json')}_novelty_results.csv", index=False)
+else:
+   print(json.load(open(filename))['fields']['status'])
