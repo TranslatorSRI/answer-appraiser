@@ -44,6 +44,7 @@ def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_c
         num_neighbors: int: 1
 
     """
+    start = time.time()
     unknown_smiles = {
         key: value
         for key, value in unknown_smiles_dict.items()
@@ -91,70 +92,115 @@ def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_c
                 if similarity >= similarity_cutoff:
                     neighbors.append((index, similarity))
             nearest_neighbor_mapping.update({unknownkey: neighbors})
+    end = time.time()
+    print(f"find_nearest_neighbors function time: {end-start}")
     return nearest_neighbor_mapping
 
 async def mol_to_smile_molpro(molecules):
-    """
-    Args:
-        List
-
-    Returns:
-        Dict
-
-    """
-
-    url = "https://molepro.transltr.io/molecular_data_provider/compound/by_id"
-    headers = {"accept": "application/json", "Content-Type": "application/json"}
-
+    start=time.time()
+    url = "https://molepro-db-transformer.transltr.io/moleprodb/elements/transform"
     smiles = {}
-
     data_mol = list(set(molecules))
-    # async with httpx.AsyncClient(timeout=30) as client:
+    message = {
+        "controls":
+            [
+            ]
+    }
     try:
-        while data_mol:
-            data_mol_before = len(data_mol)
-            response = requests.post(url, headers=headers, json=data_mol)
-            if response.status_code == 200:
-                json_response = response.json()
-                collec_url = json_response["url"]
-                temp_collec_response = requests.get(collec_url, timeout=1)
-                if temp_collec_response.status_code == 200:
-                    collec_response = temp_collec_response.json()
-
-                    for i in range(json_response["size"]):
-                        key_list = ["identifiers"]
-                        if set(key_list).issubset(collec_response["elements"][i].keys()):
-                            identifiers = collec_response["elements"][i]["identifiers"]
-                            smile = identifiers.get(
-                                "smiles", "No SMILES could be found"
-                            )
-                            smiles[data_mol[i]] = smile
-                        else:
-                            smiles[data_mol[i]] = "No identifiers could be found"
-
-                    # Remove molecules with successfully retrieved smiles from data_mol
-                    data_mol = [mol for mol in data_mol if mol not in smiles]
-                    data_mol_after = len(data_mol)
-                    # print(f'after: {len(data_mol)}')
-
-                    if data_mol_after == data_mol_before:
-                        break
-
+        for i in data_mol:
+            message["controls"].append({
+                "name": "id",
+                "value": i
+            })
+        response = requests.post(url, json=message)
+        if response.status_code == 200:
+            for idi, i in enumerate(response.json()):
+                if "smiles" in i['identifiers'].keys():
+                    if i['identifiers']['smiles'] != None:
+                        smiles[data_mol[idi]] = i['identifiers']['smiles']
+                    else:
+                        smiles[data_mol[idi]] = "No SMILES could be found"
                 else:
-                    print(
-                        f"Error: {temp_collec_response.status_code} - {temp_collec_response.text}"
-                    )
-                    break
-            else:
-                print(f"Error: {response.status_code} - {response.text}")
-                break
+                    smiles[data_mol[idi]] = "No SMILES could be found"
+
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+
     except Exception as e:
         for idx, i in enumerate(data_mol):
-            smiles[i] = "No identifiers could be found"
-
+            smiles[i] = "No SMILES could be found"
+    end = time.time()
+    print(f"smiles computation time:{end-start}")
+    # print(smiles)
     return smiles
 
+# async def mol_to_smile_molpro(molecules):
+#     start=time.time()
+#     """
+#     Args:
+#         List
+#
+#     Returns:
+#         Dict
+#
+#     """
+#
+#     url = "https://molepro.transltr.io/molecular_data_provider/compound/by_id"
+#     headers = {"accept": "application/json", "Content-Type": "application/json"}
+#
+#     smiles = {}
+#
+#     data_mol = list(set(molecules))
+#     # async with httpx.AsyncClient(timeout=30) as client:
+#     try:
+#         while data_mol:
+#             data_mol_before = len(data_mol)
+#             response = requests.post(url, headers=headers, json=data_mol)
+#             if response.status_code == 200:
+#                 json_response = response.json()
+#                 collec_url = json_response["url"]
+#                 temp_collec_response = requests.get(collec_url, timeout=1)
+#                 if temp_collec_response.status_code == 200:
+#                     collec_response = temp_collec_response.json()
+#
+#                     for i in range(json_response["size"]):
+#                         key_list = ["identifiers"]
+#                         if set(key_list).issubset(collec_response["elements"][i].keys()):
+#                             identifiers = collec_response["elements"][i]["identifiers"]
+#                             smile = identifiers.get(
+#                                 "smiles", "No SMILES could be found"
+#                             )
+#                             smiles[data_mol[i]] = smile
+#                         else:
+#                             smiles[data_mol[i]] = "No identifiers could be found"
+#
+#                     # Remove molecules with successfully retrieved smiles from data_mol
+#                     data_mol = [mol for mol in data_mol if mol not in smiles]
+#                     data_mol_after = len(data_mol)
+#                     # print(f'after: {len(data_mol)}')
+#
+#                     if data_mol_after == data_mol_before:
+#                         break
+#
+#                 else:
+#                     print(
+#                         f"Error: {temp_collec_response.status_code} - {temp_collec_response.text}"
+#                     )
+#                     break
+#             else:
+#                 print(f"Error: {response.status_code} - {response.text}")
+#                 break
+#     except Exception as e:
+#         for idx, i in enumerate(data_mol):
+#             smiles[i] = "No identifiers could be found"
+#     end = time.time()
+#     print(f"smiles computation time:{end-start}")
+#     return smiles
+
+
+
 async def molecular_sim(known, unknown, message, query_id):
+    start = time.time()
     unknown_ids = []
     known_ids = []
     if len(unknown) > 0:
@@ -176,6 +222,8 @@ async def molecular_sim(known, unknown, message, query_id):
     smile_unkown = await mol_to_smile_molpro(unknown_ids)
     smile_known = await mol_to_smile_molpro(known_ids)
     similarity_map = find_nearest_neighbors(smile_unkown, smile_known, 0, 1)
+    end = time.time()
+    print(f"molecular_sim function time:{end-start}")
     return similarity_map
 
 def get_publication_info(pub_id):
@@ -191,6 +239,7 @@ def get_publication_info(pub_id):
         val = r.get(key)
         if val:
             pmid_years.append(int(val))
+    # print(pmid_years)
     return pmid_years
 
 def sigmoid(x):
@@ -619,7 +668,7 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
             for c in range(len(novelty_score_rec)):
                 novelty_score_final = wt_rec_clin * novelty_score_rec_clin[c] + wt_md * novelty_score_md[c]
                 df_numpy[c].append(novelty_score_final)
-
+        print(f"Similarity Computation Time: {time.time()-recency_done}")
         df_numpy = pd.DataFrame(df_numpy, columns= column_list)
 
     except Exception as e:
@@ -633,12 +682,13 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
 
     return df_numpy
 
-filename = 'e2ed43f8-b2c7-4f0e-9eb8-169bdca50444.json'
+# filename = 'e2ed43f8-b2c7-4f0e-9eb8-169bdca50444.json'
 # filename = "7aa4575e-8f98-47fe-931a-85bd6178ed46.json"
-message = json.load(open(filename))['fields']['data']['message']
-print(json.load(open(filename))['fields']['status'])
-if json.load(open(filename))['fields']['status'] == "Done":
-   df = asyncio.run(compute_novelty(message, None))
-   df.to_csv(f"{filename.rstrip('.json')}_novelty_results.csv", index=False)
-else:
-   print(json.load(open(filename))['fields']['status'])
+# # filename = '2e2cb6f5-10f7-492e-adb8-db37ea99ce31.json'
+# message = json.load(open(filename))['fields']['data']['message']
+# print(json.load(open(filename))['fields']['status'])
+# if json.load(open(filename))['fields']['status'] == "Done":
+#    df = asyncio.run(compute_novelty(message, None))
+#    df.to_csv(f"{filename.rstrip('.json')}_novelty_results.csv", index=False)
+# else:
+#    print(json.load(open(filename))['fields']['status'])
