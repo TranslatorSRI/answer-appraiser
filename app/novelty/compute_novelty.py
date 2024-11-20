@@ -6,14 +6,16 @@ import traceback
 import json
 from rdkit import Chem
 from rdkit import DataStructs
-from rdkit.Chem import AllChem
+from rdkit.Chem import rdFingerprintGenerator
 import os, sys
 import time
 import asyncio
 import requests
 import redis
-from gene_nmf import gene_nmf_adapter as adapter
+import gene_nmf_adapter as adapter
 import dcc.dcc_utils as dutils
+# from gene_nmf import gene_nmf_adapter as adapter
+# import dcc.dcc_utils as dutils
 
 """
 This script computes the novelty score for a list of results obtained for a 1-H response using publications from 5 ARAs.
@@ -52,12 +54,14 @@ def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_c
             nearest_neighbor_mapping.update({unknownkey: neighbors})
         else:
             # Calculate fingerprints for the query molecule
-            query_fp = AllChem.GetMorganFingerprintAsBitVect(query_mol, 2, nBits=2048)
+            mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2,fpSize=2048)
+            query_fp = mfpgen.GetFingerprint(query_mol)
 
             # Calculate similarity scores between the query molecule and all molecules in the dataset
             similarities = []
+            
             for key, mol in known_mols.items():
-                fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
+                fp = mfpgen.GetFingerprint(mol)
                 similarity = DataStructs.TanimotoSimilarity(query_fp, fp)
                 similarities.append((key, similarity))
 
@@ -86,24 +90,25 @@ async def mol_to_smile_molpro(molecules):
             ]
     }
     try:
-        for i in data_mol:
-            message["controls"].append({
-                "name": "id",
-                "value": i
-            })
-        response = requests.post(url, json=message)
-        if response.status_code == 200:
-            for idi, i in enumerate(response.json()):
-                if "smiles" in i['identifiers'].keys():
-                    if i['identifiers']['smiles'] != None:
-                        smiles[data_mol[idi]] = i['identifiers']['smiles']
+        async with httpx.AsyncClient(timeout=30) as client:
+            for i in data_mol:
+                message["controls"].append({
+                    "name": "id",
+                    "value": i
+                })
+            response = await client.post(url, json=message)
+            if response.status_code == 200:
+                for idi, i in enumerate(response.json()):
+                    if "smiles" in i['identifiers'].keys():
+                        if i['identifiers']['smiles'] != None:
+                            smiles[data_mol[idi]] = i['identifiers']['smiles']
+                        else:
+                            smiles[data_mol[idi]] = "No SMILES could be found"
                     else:
                         smiles[data_mol[idi]] = "No SMILES could be found"
-                else:
-                    smiles[data_mol[idi]] = "No SMILES could be found"
 
-        else:
-            print(f"Error: {response.status_code} - {response.text}")
+            else:
+                print(f"Error: {response.status_code} - {response.text}")
 
     except Exception as e:
         for idx, i in enumerate(data_mol):
