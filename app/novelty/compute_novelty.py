@@ -12,38 +12,19 @@ import time
 import asyncio
 import requests
 import redis
-
-startup_utils_path = os.path.abspath("app/novelty/gene_nmf_adapter.py")
-startup_utils_dir = os.path.dirname(startup_utils_path)
-sys.path.insert(0, startup_utils_dir)
-print("added to python path the following directory: {}".format(startup_utils_dir))
 import gene_nmf_adapter as adapter
 import dcc.dcc_utils as dutils
 
 """
-This script computes the novelty score for a list of results obtained for a 1-H response.
+This script computes the novelty score for a list of results obtained for a 1-H response using publications from 5 ARAs.
 The steps for the ideal workflow are as follows:
-1. Distinguish whether the result is a known result or an unknown result.
-2. Compute FDA approval status to check if currently under approval or already approved.
-3. Compute recency by noting the associated publications of the result.
-4. Compute molecular similarity to identify if similar to existing drugs.
- 
-The end result of this script displays a table with values from different columns and accordingly lists the novelty score as well.
+1. Distinguish whether the result is curated or not.
+2. If not curated, calculate recency using all associated publications with the result
+3. If result for the query is a chemical: Molecular Distinctiveness + Clinical Trials/Approval
+4. If result for the query is a gene: Gene Distinctiveness + TDLs
 """
 
 def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_cutoff, num_neighbors):
-    """
-
-    Returns:
-        Dict
-
-    Args:
-        unknown_smiles_dict: Dict
-        known_smiles_dict: Dict
-        similarity_cutoff: float: 0
-        num_neighbors: int: 1
-
-    """
     start = time.time()
     unknown_smiles = {
         key: value
@@ -62,8 +43,6 @@ def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_c
         known_mol = Chem.MolFromSmiles(value)
         if known_mol is not None:
             known_mols.update({key: known_mol})
-        # else:
-        #     known_mols.update({key: known_mol})
     nearest_neighbor_mapping = {}
     for unknownkey, value in unknown_smiles.items():
         query_mol = Chem.MolFromSmiles(value)
@@ -73,12 +52,12 @@ def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_c
             nearest_neighbor_mapping.update({unknownkey: neighbors})
         else:
             # Calculate fingerprints for the query molecule
-            query_fp = AllChem.GetMorganFingerprint(query_mol, 2)
+            query_fp = AllChem.GetMorganFingerprintAsBitVect(query_mol, 2, nBits=2048)
 
             # Calculate similarity scores between the query molecule and all molecules in the dataset
             similarities = []
             for key, mol in known_mols.items():
-                fp = AllChem.GetMorganFingerprint(mol, 2)
+                fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
                 similarity = DataStructs.TanimotoSimilarity(query_fp, fp)
                 similarities.append((key, similarity))
 
@@ -131,73 +110,7 @@ async def mol_to_smile_molpro(molecules):
             smiles[i] = "No SMILES could be found"
     end = time.time()
     print(f"smiles computation time:{end-start}")
-    # print(smiles)
     return smiles
-
-# async def mol_to_smile_molpro(molecules):
-#     start=time.time()
-#     """
-#     Args:
-#         List
-#
-#     Returns:
-#         Dict
-#
-#     """
-#
-#     url = "https://molepro.transltr.io/molecular_data_provider/compound/by_id"
-#     headers = {"accept": "application/json", "Content-Type": "application/json"}
-#
-#     smiles = {}
-#
-#     data_mol = list(set(molecules))
-#     # async with httpx.AsyncClient(timeout=30) as client:
-#     try:
-#         while data_mol:
-#             data_mol_before = len(data_mol)
-#             response = requests.post(url, headers=headers, json=data_mol)
-#             if response.status_code == 200:
-#                 json_response = response.json()
-#                 collec_url = json_response["url"]
-#                 temp_collec_response = requests.get(collec_url, timeout=1)
-#                 if temp_collec_response.status_code == 200:
-#                     collec_response = temp_collec_response.json()
-#
-#                     for i in range(json_response["size"]):
-#                         key_list = ["identifiers"]
-#                         if set(key_list).issubset(collec_response["elements"][i].keys()):
-#                             identifiers = collec_response["elements"][i]["identifiers"]
-#                             smile = identifiers.get(
-#                                 "smiles", "No SMILES could be found"
-#                             )
-#                             smiles[data_mol[i]] = smile
-#                         else:
-#                             smiles[data_mol[i]] = "No identifiers could be found"
-#
-#                     # Remove molecules with successfully retrieved smiles from data_mol
-#                     data_mol = [mol for mol in data_mol if mol not in smiles]
-#                     data_mol_after = len(data_mol)
-#                     # print(f'after: {len(data_mol)}')
-#
-#                     if data_mol_after == data_mol_before:
-#                         break
-#
-#                 else:
-#                     print(
-#                         f"Error: {temp_collec_response.status_code} - {temp_collec_response.text}"
-#                     )
-#                     break
-#             else:
-#                 print(f"Error: {response.status_code} - {response.text}")
-#                 break
-#     except Exception as e:
-#         for idx, i in enumerate(data_mol):
-#             smiles[i] = "No identifiers could be found"
-#     end = time.time()
-#     print(f"smiles computation time:{end-start}")
-#     return smiles
-
-
 
 async def molecular_sim(known, unknown, message, query_id):
     start = time.time()
@@ -227,11 +140,6 @@ async def molecular_sim(known, unknown, message, query_id):
     return similarity_map
 
 def get_publication_info(pub_id):
-    """
-    Args: PMID
-    Returns: The publication info
-    """
-
     # Connect to Redis
     r = redis.Redis(host='localhost', port=6379, db=0)
     pmid_years = []
@@ -239,7 +147,6 @@ def get_publication_info(pub_id):
         val = r.get(key)
         if val:
             pmid_years.append(int(val))
-    # print(pmid_years)
     return pmid_years
 
 def sigmoid(x):
@@ -299,64 +206,40 @@ def recency_function_exp(number_of_publ, age_of_oldest_publ, max_number, max_age
 def extracting_publications(message, result):
     """
     Function to extract publications information for every result.
-    Four ARAs: ARAX, ARAGORN, BTE and UNSECRET produce results with publications informations
+    Five ARAs: ARAX, ARAGORN, BTE, IMPROVING and UNSECRET produce results with publications information
     """
     publications = []
     for idi, i in enumerate(result['analyses']):
-        result_resource = i['resource_id']
         edge_keys = list(i['edge_bindings'].keys())
-        if result_resource=="infores:unsecret-agent":
-            for idj, j in enumerate(i['edge_bindings'][edge_keys[0]]):
-                aux_graph, edges = [], []
-                if 'creative' not in j['id']:
-                    edges.append(j['id'])
-                else:
-                    for idl, l in enumerate(message['knowledge_graph']['edges'][j['id']]['attributes']):
-                        if l['attribute_type_id'] == "biolink:support_graphs":
-                            aux_graph.extend(l['value'])
-                            break
-                    for idl, l in enumerate(aux_graph):
-                        edges.extend(message['auxiliary_graphs'][l]['edges'])
+        for idj, j in enumerate(i['edge_bindings'][edge_keys[0]]):
+            aux_graph, edges = [], []
+            for idl, l in enumerate(message['knowledge_graph']['edges'][j['id']]['attributes']):
+                if l['attribute_type_id'] == "biolink:publications":
+                    publications.extend(l['value'])
+                    break
 
-                for e in edges:
-                    knowledge_graph_edge = message['knowledge_graph']['edges'][e]
-                    for idl, l in enumerate(knowledge_graph_edge['attributes']):
-                        if l['attribute_type_id'] == "biolink:publications":
-                            publications.extend(l['value'])
-                            break
+                if l['attribute_type_id'] == "biolink:support_graphs":
+                    aux_graph.extend(l['value'])
+                    break
 
-        elif result_resource=="infores:aragorn":
-            for idj, j in enumerate(i['edge_bindings'][edge_keys[0]]):
-                for idl, l in enumerate(message['knowledge_graph']['edges'][j['id']]['attributes']):
+            for idl, l in enumerate(aux_graph):
+                edges.extend(message['auxiliary_graphs'][l]['edges'])
+
+            for e in edges:
+                knowledge_graph_edge = message['knowledge_graph']['edges'][e]
+                for idl, l in enumerate(knowledge_graph_edge['attributes']):
                     if l['attribute_type_id'] == "biolink:publications":
                         publications.extend(l['value'])
                         break
 
-        elif result_resource=="infores:arax":
-            for idj, j in enumerate(i['support_graphs']):
-                for idl, l in enumerate(message['auxiliary_graphs'][j]['edges']):
-                    for idm, m in enumerate(message['knowledge_graph']['edges'][l]['attributes']):
-                        if m['attribute_type_id'] == "biolink:publications":
-                            publications.extend(m['value'])
-                            break
-
-        elif result_resource=="infores:biothings-explorer":
-            for idj, j in enumerate(i['edge_bindings'][edge_keys[0]]):
-                aux_graph, edges = [], []
-                for idk, k in enumerate(message['knowledge_graph']['edges'][j['id']]['attributes']):
-                    if k['attribute_type_id'] == "biolink:support_graphs":
-                        aux_graph.extend(k['value'])
-
-                for idk, k in enumerate(aux_graph):
-                    edges.extend(message['auxiliary_graphs'][k]['edges'])
-
-
-                for e in edges:
-                    knowledge_graph_edge = message['knowledge_graph']['edges'][e]
-                    for idl, l in enumerate(knowledge_graph_edge['attributes']):
-                        if l['attribute_type_id'] == "biolink:publications":
-                            publications.extend(l['value'])
-                            break
+            if 'support_graphs' in i.keys():
+                if i['support_graphs']!= None:
+                    for idj, j in enumerate(i['support_graphs']):
+                        for idl, l in enumerate(message['auxiliary_graphs'][j]['edges']):
+                            for idm, m in enumerate(message['knowledge_graph']['edges'][l]['attributes']):
+                                if m['attribute_type_id'] == "biolink:publications":
+                                    publications.extend(m['value'])
+                                    break
     return publications
 
 def extract_results(message, unknown, known):
@@ -398,11 +281,6 @@ def result_edge_correlation(results, results_known, df):
     return df_res, res_unknown, res_known
 
 async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec_clin = 0.3, wt_md = 0.7):
-    """
-    INPUT: JSON Response with merged annotated results for a 1-H query
-
-    OUTPUT: Pandas DataFrame  with FDA Status, Recency, Similarity and Novelty score per result
-    """
     start = time.time()
     today = date.today()
 
@@ -482,7 +360,6 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
             else:
                 number_of_publ = len(publications)
                 if number_of_publ!=0:
-                    # publications_1 = ",".join(publications)
                     try:
                         response_pub = get_publication_info(
                             publications
@@ -651,7 +528,6 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
                                         else:
                                             novelty_score_rec_clin.append(novelty_score_rec[idi])
                                         found = 1
-                                        # print(idi, phase_trials)
                             if found == 0:
                                 df_numpy[idi].extend([f"No clinical information"])
                                 novelty_score_rec_clin.append(novelty_score_rec[idi])
@@ -681,14 +557,3 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
         df_numpy = pd.DataFrame([[0]*len(column_list)]*len(message['results']), columns = column_list)
 
     return df_numpy
-
-# filename = 'e2ed43f8-b2c7-4f0e-9eb8-169bdca50444.json'
-# filename = "7aa4575e-8f98-47fe-931a-85bd6178ed46.json"
-# # filename = '2e2cb6f5-10f7-492e-adb8-db37ea99ce31.json'
-# message = json.load(open(filename))['fields']['data']['message']
-# print(json.load(open(filename))['fields']['status'])
-# if json.load(open(filename))['fields']['status'] == "Done":
-#    df = asyncio.run(compute_novelty(message, None))
-#    df.to_csv(f"{filename.rstrip('.json')}_novelty_results.csv", index=False)
-# else:
-#    print(json.load(open(filename))['fields']['status'])
