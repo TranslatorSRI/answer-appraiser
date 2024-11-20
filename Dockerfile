@@ -1,4 +1,4 @@
-FROM renciorg/renci-python-image:v0.0.1
+FROM ghcr.io/translatorsri/renci-python-image:3.12.4
 
 # Add image info
 LABEL org.opencontainers.image.source /github.com/TranslatorSRI/answer-appraiser

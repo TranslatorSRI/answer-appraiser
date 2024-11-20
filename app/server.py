@@ -1,14 +1,15 @@
+import gzip
+import json
 import logging
+import os
 import redis
 import traceback
+import warnings
 
-from fastapi import Body, BackgroundTasks, HTTPException, status
-from fastapi.responses import JSONResponse
-import httpx
+from fastapi import HTTPException, status, Request
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.cors import CORSMiddleware
 from uuid import uuid4
-
-from reasoner_pydantic import AsyncQuery, AsyncQueryResponse, Response, Query
 
 from .config import settings
 from .logger import setup_logger, get_logger
@@ -21,7 +22,7 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="SRI Answer Appraiser",
-    version="0.5.1",
+    version="0.6.1",
     terms_of_service="",
     description="SRI service that provides metrics for scoring and ordering of results",
     trapi="1.5.0",
@@ -52,6 +53,40 @@ APP.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if settings.jaeger_enabled == "True":
+    LOGGER.info("Starting up Jaeger")
+
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry import trace
+    from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+    from opentelemetry.sdk.resources import (
+        SERVICE_NAME,
+        Resource,
+    )
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
+    # httpx connections need to be open a little longer by the otel decorators
+    # but some libs display warnings of resource being unclosed.
+    # these supresses such warnings.
+    logging.captureWarnings(capture=True)
+    warnings.filterwarnings("ignore", category=ResourceWarning)
+    service_name = os.environ.get("OTEL_SERVICE_NAME", "ANSWER-APPRAISER")
+    jaeger_exporter = JaegerExporter(
+        agent_host_name=settings.jaeger_host,
+        agent_port=int(settings.jaeger_port),
+    )
+    resource = Resource(attributes={SERVICE_NAME: service_name})
+    provider = TracerProvider(resource=resource)
+    processor = BatchSpanProcessor(jaeger_exporter)
+    provider.add_span_processor(processor)
+    trace.set_tracer_provider(provider)
+    FastAPIInstrumentor.instrument_app(
+        APP, tracer_provider=provider, excluded_urls="docs,openapi.json,redis_ready"
+    )
+    HTTPXClientInstrumentor().instrument()
 
 EXAMPLE = {
     "message": {
@@ -113,65 +148,28 @@ EXAMPLE = {
     }
 }
 
-ASYNC_EXAMPLE = {
-    "callback": "http://test",
-    **EXAMPLE,
-}
 
-
-async def async_appraise(message, callback, logger: logging.Logger):
-    try:
-        await get_ordering_components(message, logger)
-    except Exception:
-        logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
-    logger.info("Done appraising")
-    try:
-        logger.info(f"Posting to callback {callback}")
-        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=600.0)) as client:
-            res = await client.post(callback, json=message)
-            logger.info(f"Posted to {callback} with code {res.status_code}")
-    except Exception as e:
-        logger.error(f"Unable to post to callback {callback}.")
-
-
-@APP.post("/async_get_appraisal", response_model=AsyncQueryResponse)
-async def get_appraisal(
-    background_tasks: BackgroundTasks,
-    query: AsyncQuery = Body(..., example=ASYNC_EXAMPLE),
-):
-    """Appraise Answers"""
+@APP.post("/get_appraisal")
+async def sync_get_appraisal(request: Request):
     qid = str(uuid4())[:8]
-    query_dict = query.dict()
-    log_level = query_dict.get("log_level") or "INFO"
-    logger = get_logger(qid, log_level)
-    logger.info("Starting async appraisal")
-    message = query_dict["message"]
-    if not message.get("results"):
-        logger.warning("No results given.")
-        return JSONResponse(
-            content={"status": "Rejected", "description": "No Results.", "job_id": qid},
-            status_code=400,
-        )
-    callback = query_dict["callback"]
-    background_tasks.add_task(async_appraise, message, callback, logger)
-    return JSONResponse(
-        content={
-            "status": "Accepted",
-            "description": f"Appraising answers. Will send response to {callback}",
-            "job_id": qid,
-        },
-        status_code=200,
-    )
-
-
-@APP.post("/get_appraisal", response_model=Response)
-async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
-    qid = str(uuid4())[:8]
-    query_dict = query.dict()
-    log_level = query_dict.get("log_level") or "INFO"
-    logger = get_logger(qid, log_level)
+    logger = get_logger(qid, "INFO")
     logger.info("Starting sync appraisal")
-    message = query_dict["message"]
+    compressed = False
+    if request.headers.get("content-encoding") == "gzip":
+        try:
+            raw_body = await request.body()
+            query = json.loads(gzip.decompress(raw_body))
+            compressed = True
+        except Exception:
+            return Response("Invalid request. Failed to decompress and ingest.", 400)
+    else:
+        try:
+            query = await request.json()
+        except json.JSONDecodeError:
+            return Response("Invalid request. Failed to parse JSON.", 400)
+    log_level = query.get("log_level") or "INFO"
+    logger.setLevel(log_level)
+    message = query["message"]
     if not message.get("results"):
         return JSONResponse(
             content={"status": "Rejected", "description": "No Results.", "job_id": qid},
@@ -181,8 +179,12 @@ async def sync_get_appraisal(query: Query = Body(..., example=EXAMPLE)):
         await get_ordering_components(message, logger)
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
+    if compressed:
+        query = gzip.compress(json.dumps(query).encode())
+    else:
+        query = json.dumps(query)
     logger.info("Done appraising")
-    return Response(message=message)
+    return Response(query)
 
 
 @APP.get("/redis_ready")
