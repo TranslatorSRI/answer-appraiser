@@ -12,7 +12,7 @@ import time
 import asyncio
 import requests
 import redis
-import gene_nmf_adapter as adapter
+from gene_nmf import gene_nmf_adapter as adapter
 import dcc.dcc_utils as dutils
 
 """
