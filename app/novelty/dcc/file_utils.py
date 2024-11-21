@@ -34,11 +34,11 @@
 # imports
 import json
 
-import dcc.dcc_utils as dutils 
+from .dcc_utils import get_logger 
 
 
 # constants
-logger = dutils.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 # methods

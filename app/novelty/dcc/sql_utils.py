@@ -33,11 +33,11 @@
 # imports
 import sqlite3
 
-import dcc.dcc_utils as dutils 
+from .dcc_utils import get_logger
 
 
 # constants
-logger = dutils.get_logger(__name__)
+logger = get_logger(__name__)
 SQL_SELECT_ALL_GENES = "select distinct gene_name, gene_ontology_id from nmf_ontology_gene"
 SQL_SELECT_GENE_NAMES_FROM_LIST = "select distinct gene_name from nmf_ontology_gene where gene_synonym in ({})"
 SQL_SELECT_GENE_CURIES_FROM_LIST = "select distinct gene_ontology_id from nmf_ontology_gene where gene_synonym in ({})"

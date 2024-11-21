@@ -34,11 +34,11 @@
 import numpy as np
 from scipy.sparse import csc_matrix
 
-import dcc.file_utils as futils 
-import dcc.dcc_utils as dutils 
+from .file_utils import read_tab_delimited_file 
+from .dcc_utils import get_logger 
 
 # constants
-logger = dutils.get_logger(__name__)
+logger = get_logger(__name__)
 
 # session vars
 # matrix_gene_set = None
@@ -64,7 +64,7 @@ def load_geneset_matrix(map_gene_index, list_gene_set_files, path_gene_set_files
 
     # read the file
     for file in list_gene_set_files:
-        map_gene_set = futils.read_tab_delimited_file(path_gene_set_files + file)
+        map_gene_set = read_tab_delimited_file(path_gene_set_files + file)
 
         # log
         logger.info("read gene set file: {} with num entries: {}".format(file, len(map_gene_set)))

@@ -12,10 +12,8 @@ import time
 import asyncio
 import requests
 import redis
-import gene_nmf_adapter as adapter
-import dcc.dcc_utils as dutils
-# from gene_nmf import gene_nmf_adapter as adapter
-# import dcc.dcc_utils as dutils
+from .gene_nmf_adapter import get_gene_nmf_novelty_for_gene_list
+from .dcc import dcc_utils as dutils
 
 """
 This script computes the novelty score for a list of results obtained for a 1-H response using publications from 5 ARAs.
@@ -392,7 +390,7 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
             column_list = ['Query ID', 'Result ID', 'Location 1', 'Location 2', 'Curated or not ?', 'Recency Score',
                            'Gene Distinctiveness', 'TDLs', 'novelty_score']
 
-            map_result = adapter.get_gene_nmf_novelty_for_gene_list(list_input_genes=result_ids_list, log=True)
+            map_result = get_gene_nmf_novelty_for_gene_list(list_input_genes=result_ids_list, log=True)
             map_result_keys = list(map_result['gene_results'].keys())
             for idi, i in enumerate(message['results']):
                 if idi in unknown_list:

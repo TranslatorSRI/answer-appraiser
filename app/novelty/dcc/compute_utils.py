@@ -45,8 +45,8 @@ from sklearn.decomposition import NMF
 import json
 import time
 
-import dcc.dcc_utils as dutils 
-import dcc.matrix_utils as mutils 
+from .dcc_utils import get_logger 
+from .matrix_utils import generate_gene_vector_from_list
 
 # TODO - process notes
 # 1. done - X matrix is sitting in memory (something like 20K genes x 40K gene sets)
@@ -65,7 +65,7 @@ import dcc.matrix_utils as mutils
 # (Each factor is a cluster)
 
 # constants
-logger = dutils.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 BATCH_SIZE = 4500
@@ -96,7 +96,7 @@ def calculate_factors(matrix_gene_sets_gene_original, list_gene, list_system_gen
     # step 1/2: get the gene vector from the gene list
     if log:
         logger.info("step 0: got input gene list from user of size: {}".format(len(list_gene)))
-    vector_gene, list_input_gene_indices = mutils.generate_gene_vector_from_list(list_gene=list_gene, map_gene_index=map_gene_index)
+    vector_gene, list_input_gene_indices = generate_gene_vector_from_list(list_gene=list_gene, map_gene_index=map_gene_index)
 
     # log
     if log:

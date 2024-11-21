@@ -36,12 +36,19 @@
 # imports
 import os 
 
-import dcc.startup_utils as sutils
-import dcc.matrix_utils as mutils 
-import dcc.compute_utils as cutils 
-import dcc.dcc_utils as dutils 
-import dcc.sql_utils as sql_utils
-import dcc.gui_utils as gutils
+from .dcc import startup_utils as sutils
+from .dcc import matrix_utils as mutils
+from .dcc import compute_utils as cutils
+from .dcc import dcc_utils as dutils
+from .dcc import sql_utils as sql_utils
+from .dcc import gui_utils as gutils
+
+# import dcc.startup_utils as sutils
+# import dcc.matrix_utils as mutils 
+# import dcc.compute_utils as cutils 
+# import dcc.dcc_utils as dutils 
+# import dcc.sql_utils as sql_utils
+# import dcc.gui_utils as gutils
 
 
 # constants

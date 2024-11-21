@@ -32,7 +32,7 @@
 
 # imports
 import json
-from dcc.dcc_utils import get_logger
+from .dcc_utils import get_logger
 
 # constants
 # DIR_CONF = "python-flask-server/conf/"

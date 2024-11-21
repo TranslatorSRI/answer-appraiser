@@ -31,13 +31,13 @@
 # DAMAGE.
 
 # imports
-import dcc.matrix_utils as mutils 
-import dcc.dcc_utils as dutils 
+from .matrix_utils import sum_of_gene_row 
+from .dcc_utils import get_logger 
 
 
 
 # constants
-logger = dutils.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 # methods
@@ -73,7 +73,7 @@ def gui_build_results_map(list_factor, list_factor_genes, list_factor_gene_sets,
             index_gene = map_gene_index.get(gene_name)
             if index_gene:
                 # get the number of pathways the gene is in
-                count_pathways = mutils.sum_of_gene_row(sparse_matrix=matrix_gene_sets, gene_index=index_gene).item()
+                count_pathways = sum_of_gene_row(sparse_matrix=matrix_gene_sets, gene_index=index_gene).item()
                 map_result_genes.get(ontology_id)['count_pathways'] = count_pathways
 
                 # add the novelty score to the gene
@@ -115,7 +115,7 @@ def gui_build_novelty_results_map(map_gene_ontology, list_input_gene_names, map_
             index_gene = map_gene_index.get(gene_name)
             if index_gene:
                 # get the number of pathways the gene is in
-                count_pathways = mutils.sum_of_gene_row(sparse_matrix=matrix_gene_sets, gene_index=index_gene).item()
+                count_pathways = sum_of_gene_row(sparse_matrix=matrix_gene_sets, gene_index=index_gene).item()
                 map_result_genes.get(ontology_id)['count_pathways'] = count_pathways
 
                 # add the novelty score to the gene
