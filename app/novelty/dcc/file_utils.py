@@ -1,4 +1,3 @@
-
 # LICENSE
 # Copyright 2024 Flannick Lab
 
@@ -34,7 +33,7 @@
 # imports
 import json
 
-from .dcc_utils import get_logger 
+from .dcc_utils import get_logger
 
 
 # constants
@@ -43,16 +42,16 @@ logger = get_logger(__name__)
 
 # methods
 def read_tab_delimited_file(file_path, log=False):
-    '''
+    """
     will read the pathway file and build a map of gene lists
-    '''
+    """
     # initialize
     result = {}
 
     # read in the data
-    with open(file_path, 'r', encoding='utf-8') as file:
+    with open(file_path, "r", encoding="utf-8") as file:
         for line in file:
-            fields = line.strip().split('\t')
+            fields = line.strip().split("\t")
             stripped_list = [item.strip() for item in fields]
 
             key = fields[0]
@@ -67,16 +66,16 @@ def read_tab_delimited_file(file_path, log=False):
 
 
 def load_gene_file_into_map(file_path, log=False):
-    '''
+    """
     will read the gene file and return a map of gene to position in array
-    '''
+    """
     # DEPRECATED - now get it from sqlite db
     # initialize
     map_result = {}
     list_temp = []
 
     # read in the data
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         for line in file:
             gene = line.strip()
             list_temp.append(gene)
@@ -89,30 +88,28 @@ def load_gene_file_into_map(file_path, log=False):
     map_result = {value: index for index, value in enumerate(list_unique_gene)}
 
     # log
-    logger.info("loaded gene file: {} into num count map: {}".format(file_path, len(map_result)))
+    logger.info(
+        "loaded gene file: {} into num count map: {}".format(file_path, len(map_result))
+    )
 
     # return
     return map_result, list_unique_gene
 
 
 def get_all_files_in_dir(path_dir, log=False):
-    '''
-    will return the files in the directory 
-    '''
+    """
+    will return the files in the directory
+    """
     list_result = []
 
     # get the files
 
     # return
     return list_result
-    
-
-
-
 
 
 if __name__ == "__main__":
 
-    file_path = '/home/javaprog/Code/TranslatorWorkspace/PigeanFlask/python-flask-server/conf/gene_lists/gene_set_list_msigdb_h.txt'
+    file_path = "/home/javaprog/Code/TranslatorWorkspace/PigeanFlask/python-flask-server/conf/gene_lists/gene_set_list_msigdb_h.txt"
     data = read_tab_delimited_file(file_path)
     print(json.dumps(data, indent=2))

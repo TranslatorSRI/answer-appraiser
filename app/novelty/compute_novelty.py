@@ -19,7 +19,10 @@ The steps for the ideal workflow are as follows:
 4. If result for the query is a gene: Gene Distinctiveness + TDLs
 """
 
-def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_cutoff, num_neighbors):
+
+def find_nearest_neighbors(
+    unknown_smiles_dict, known_smiles_dict, similarity_cutoff, num_neighbors
+):
     start = time.time()
     unknown_smiles = {
         key: value
@@ -47,12 +50,12 @@ def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_c
             nearest_neighbor_mapping.update({unknownkey: neighbors})
         else:
             # Calculate fingerprints for the query molecule
-            mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2,fpSize=2048)
+            mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
             query_fp = mfpgen.GetFingerprint(query_mol)
 
             # Calculate similarity scores between the query molecule and all molecules in the dataset
             similarities = []
-            
+
             for key, mol in known_mols.items():
                 fp = mfpgen.GetFingerprint(mol)
                 similarity = DataStructs.TanimotoSimilarity(query_fp, fp)
@@ -72,29 +75,23 @@ def find_nearest_neighbors( unknown_smiles_dict, known_smiles_dict, similarity_c
     print(f"find_nearest_neighbors function time: {end-start}")
     return nearest_neighbor_mapping
 
+
 async def mol_to_smile_molpro(molecules):
-    start=time.time()
+    start = time.time()
     url = "https://molepro-db-transformer.transltr.io/moleprodb/elements/transform"
     smiles = {}
     data_mol = list(set(molecules))
-    message = {
-        "controls":
-            [
-            ]
-    }
+    message = {"controls": []}
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             for i in data_mol:
-                message["controls"].append({
-                    "name": "id",
-                    "value": i
-                })
+                message["controls"].append({"name": "id", "value": i})
             response = await client.post(url, json=message)
             if response.status_code == 200:
                 for idi, i in enumerate(response.json()):
-                    if "smiles" in i['identifiers'].keys():
-                        if i['identifiers']['smiles'] != None:
-                            smiles[data_mol[idi]] = i['identifiers']['smiles']
+                    if "smiles" in i["identifiers"].keys():
+                        if i["identifiers"]["smiles"] != None:
+                            smiles[data_mol[idi]] = i["identifiers"]["smiles"]
                         else:
                             smiles[data_mol[idi]] = "No SMILES could be found"
                     else:
@@ -110,6 +107,7 @@ async def mol_to_smile_molpro(molecules):
     print(f"smiles computation time:{end-start}")
     return smiles
 
+
 async def molecular_sim(known, unknown, message, query_id):
     start = time.time()
     unknown_ids = []
@@ -117,18 +115,26 @@ async def molecular_sim(known, unknown, message, query_id):
     if len(unknown) > 0:
         for drug in unknown:
             s = list(message["results"][drug]["node_bindings"].keys())
-            if message["results"][drug]['node_bindings'][s[0]][0]['id'] == query_id:
-                unknown_ids.append(message["results"][drug]['node_bindings'][s[1]][0]['id'])
+            if message["results"][drug]["node_bindings"][s[0]][0]["id"] == query_id:
+                unknown_ids.append(
+                    message["results"][drug]["node_bindings"][s[1]][0]["id"]
+                )
             else:
-                unknown_ids.append(message["results"][drug]['node_bindings'][s[0]][0]['id'])
+                unknown_ids.append(
+                    message["results"][drug]["node_bindings"][s[0]][0]["id"]
+                )
 
     if len(known) > 0:
         for drug in known:
             s = list(message["results"][drug]["node_bindings"].keys())
-            if message["results"][drug]['node_bindings'][s[0]][0]['id'] == query_id:
-                known_ids.append(message["results"][drug]['node_bindings'][s[1]][0]['id'])
+            if message["results"][drug]["node_bindings"][s[0]][0]["id"] == query_id:
+                known_ids.append(
+                    message["results"][drug]["node_bindings"][s[1]][0]["id"]
+                )
             else:
-                known_ids.append(message["results"][drug]['node_bindings'][s[0]][0]['id'])
+                known_ids.append(
+                    message["results"][drug]["node_bindings"][s[0]][0]["id"]
+                )
 
     smile_unkown = await mol_to_smile_molpro(unknown_ids)
     smile_known = await mol_to_smile_molpro(known_ids)
@@ -136,6 +142,7 @@ async def molecular_sim(known, unknown, message, query_id):
     end = time.time()
     print(f"molecular_sim function time:{end-start}")
     return similarity_map
+
 
 def get_publication_info(pub_id):
     # Connect to Redis
@@ -152,8 +159,10 @@ def get_publication_info(pub_id):
             pmid_years.append(int(val))
     return pmid_years
 
+
 def sigmoid(x):
     return 1 / (1 + np.exp(x))
+
 
 def query_id(message):
     for i in message["query_graph"]["nodes"]:
@@ -173,6 +182,7 @@ def query_id(message):
     else:
         chk = 0
     return known_node, unknown_node, chk
+
 
 def recency_function_exp(number_of_publ, age_of_oldest_publ, max_number, max_age):
     """
@@ -196,7 +206,7 @@ def recency_function_exp(number_of_publ, age_of_oldest_publ, max_number, max_age
     alter_age_of_oldest_publ = sigmoid(coef_age * (age_of_oldest_publ / max_age - 0.5))
 
     if np.isnan(number_of_publ) and not np.isnan(age_of_oldest_publ):
-       oldest  = alter_age_of_oldest_publ
+        oldest = alter_age_of_oldest_publ
     elif np.isnan(age_of_oldest_publ) and not np.isnan(number_of_publ):
         oldest = alter_number_of_publ
     else:
@@ -206,44 +216,52 @@ def recency_function_exp(number_of_publ, age_of_oldest_publ, max_number, max_age
 
     return recency
 
+
 def extracting_publications(message, result):
     """
     Function to extract publications information for every result.
     Five ARAs: ARAX, ARAGORN, BTE, IMPROVING and UNSECRET produce results with publications information
     """
     publications = []
-    for idi, i in enumerate(result['analyses']):
-        edge_keys = list(i['edge_bindings'].keys())
-        for idj, j in enumerate(i['edge_bindings'][edge_keys[0]]):
+    for idi, i in enumerate(result["analyses"]):
+        edge_keys = list(i["edge_bindings"].keys())
+        for idj, j in enumerate(i["edge_bindings"][edge_keys[0]]):
             aux_graph, edges = [], []
-            for idl, l in enumerate(message['knowledge_graph']['edges'][j['id']]['attributes']):
-                if l['attribute_type_id'] == "biolink:publications":
-                    publications.extend(l['value'])
+            for idl, l in enumerate(
+                message["knowledge_graph"]["edges"][j["id"]]["attributes"]
+            ):
+                if l["attribute_type_id"] == "biolink:publications":
+                    publications.extend(l["value"])
                     break
 
-                if l['attribute_type_id'] == "biolink:support_graphs":
-                    aux_graph.extend(l['value'])
+                if l["attribute_type_id"] == "biolink:support_graphs":
+                    aux_graph.extend(l["value"])
                     break
 
             for idl, l in enumerate(aux_graph):
-                edges.extend(message['auxiliary_graphs'][l]['edges'])
+                edges.extend(message["auxiliary_graphs"][l]["edges"])
 
             for e in edges:
-                knowledge_graph_edge = message['knowledge_graph']['edges'][e]
-                for idl, l in enumerate(knowledge_graph_edge['attributes']):
-                    if l['attribute_type_id'] == "biolink:publications":
-                        publications.extend(l['value'])
+                knowledge_graph_edge = message["knowledge_graph"]["edges"][e]
+                for idl, l in enumerate(knowledge_graph_edge["attributes"]):
+                    if l["attribute_type_id"] == "biolink:publications":
+                        publications.extend(l["value"])
                         break
 
-            if 'support_graphs' in i.keys():
-                if i['support_graphs']!= None:
-                    for idj, j in enumerate(i['support_graphs']):
-                        for idl, l in enumerate(message['auxiliary_graphs'][j]['edges']):
-                            for idm, m in enumerate(message['knowledge_graph']['edges'][l]['attributes']):
-                                if m['attribute_type_id'] == "biolink:publications":
-                                    publications.extend(m['value'])
+            if "support_graphs" in i.keys():
+                if i["support_graphs"] != None:
+                    for idj, j in enumerate(i["support_graphs"]):
+                        for idl, l in enumerate(
+                            message["auxiliary_graphs"][j]["edges"]
+                        ):
+                            for idm, m in enumerate(
+                                message["knowledge_graph"]["edges"][l]["attributes"]
+                            ):
+                                if m["attribute_type_id"] == "biolink:publications":
+                                    publications.extend(m["value"])
                                     break
     return publications
+
 
 def extract_results(message, unknown, known):
     results = []
@@ -269,6 +287,7 @@ def extract_results(message, unknown, known):
             kid += 1
     return results, results_known
 
+
 def result_edge_correlation(results, results_known, df):
     df_res = pd.DataFrame()
     res_known = set()
@@ -283,21 +302,28 @@ def result_edge_correlation(results, results_known, df):
             res_known.add(df.loc[df["edge"] == j, "drug"].iloc[0])
     return df_res, res_unknown, res_known
 
-async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec_clin = 0.3, wt_md = 0.7):
+
+async def compute_novelty(
+    message, logger, wt_rec_tdl=0.3, wt_gd=0.7, wt_rec_clin=0.3, wt_md=0.7
+):
     start = time.time()
     today = date.today()
 
-    query_keys = list(message['query_graph']['nodes'].keys())
-    if 'ids' in message['query_graph']['nodes'][query_keys[0]].keys():
-        if message['query_graph']['nodes'][query_keys[0]]['ids'] != None:
-            query_id_node = message['query_graph']['nodes'][query_keys[0]]['ids'][0]
-            result_id_cat = message['query_graph']['nodes'][query_keys[1]]['categories'][0]
+    query_keys = list(message["query_graph"]["nodes"].keys())
+    if "ids" in message["query_graph"]["nodes"][query_keys[0]].keys():
+        if message["query_graph"]["nodes"][query_keys[0]]["ids"] != None:
+            query_id_node = message["query_graph"]["nodes"][query_keys[0]]["ids"][0]
+            result_id_cat = message["query_graph"]["nodes"][query_keys[1]][
+                "categories"
+            ][0]
         else:
-            query_id_node = message['query_graph']['nodes'][query_keys[1]]['ids'][0]
-            result_id_cat = message['query_graph']['nodes'][query_keys[0]]['categories'][0]
+            query_id_node = message["query_graph"]["nodes"][query_keys[1]]["ids"][0]
+            result_id_cat = message["query_graph"]["nodes"][query_keys[0]][
+                "categories"
+            ][0]
     else:
-        query_id_node = message['query_graph']['nodes'][query_keys[1]]['ids'][0]
-        result_id_cat = message['query_graph']['nodes'][query_keys[0]]['categories'][0]
+        query_id_node = message["query_graph"]["nodes"][query_keys[1]]["ids"][0]
+        result_id_cat = message["query_graph"]["nodes"][query_keys[0]]["categories"][0]
     try:
         df_numpy = []
         result_ids_list = []
@@ -307,66 +333,103 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
         novelty_score_rec = []
         novelty_score_gd, novelty_score_md = [], []
         novelty_score_rec_tdl, novelty_score_rec_clin = [], []
-        for idi, i in enumerate(message['results']):
-            curated=0
-            node_binding_keys = list(i['node_bindings'].keys())
-            if i['node_bindings'][node_binding_keys[0]][0]['id'] == query_id_node:
-                result_id_node = i['node_bindings'][node_binding_keys[1]][0]['id']
+        for idi, i in enumerate(message["results"]):
+            curated = 0
+            node_binding_keys = list(i["node_bindings"].keys())
+            if i["node_bindings"][node_binding_keys[0]][0]["id"] == query_id_node:
+                result_id_node = i["node_bindings"][node_binding_keys[1]][0]["id"]
             else:
-                result_id_node = i['node_bindings'][node_binding_keys[0]][0]['id']
+                result_id_node = i["node_bindings"][node_binding_keys[0]][0]["id"]
             df_numpy.append([query_id_node, result_id_node])
-            result_node_cat = message['knowledge_graph']['nodes'][result_id_node]['categories'][0]
-            if (result_node_cat in ["biolink:Protein", "biolink:Gene"] and result_id_cat in ["biolink:Protein", "biolink:Gene"]) or (result_node_cat in ["biolink:SmallMolecule", "biolink:Drug", "biolink:ChemicalEntity", "biolink:MolecularMixture", "biolink:MolecularEntity"] and result_id_cat in ["biolink:SmallMolecule", "biolink:Drug", "biolink:ChemicalEntity"]):
+            result_node_cat = message["knowledge_graph"]["nodes"][result_id_node][
+                "categories"
+            ][0]
+            if (
+                result_node_cat in ["biolink:Protein", "biolink:Gene"]
+                and result_id_cat in ["biolink:Protein", "biolink:Gene"]
+            ) or (
+                result_node_cat
+                in [
+                    "biolink:SmallMolecule",
+                    "biolink:Drug",
+                    "biolink:ChemicalEntity",
+                    "biolink:MolecularMixture",
+                    "biolink:MolecularEntity",
+                ]
+                and result_id_cat
+                in ["biolink:SmallMolecule", "biolink:Drug", "biolink:ChemicalEntity"]
+            ):
                 result_ids_list.append(result_id_node)
                 correct_results.append(idi)
-                for idj, j in enumerate(i['analyses']):
-                    edge_keys = list(j['edge_bindings'].keys())
-                    for idk, k in enumerate(j['edge_bindings'][edge_keys[0]]):
-                        knowledge_graph_edge = message['knowledge_graph']['edges'][k['id']]
+                for idj, j in enumerate(i["analyses"]):
+                    edge_keys = list(j["edge_bindings"].keys())
+                    for idk, k in enumerate(j["edge_bindings"][edge_keys[0]]):
+                        knowledge_graph_edge = message["knowledge_graph"]["edges"][
+                            k["id"]
+                        ]
                         epc_found = 0
-                        for idl, l in enumerate(knowledge_graph_edge['attributes']):
-                            if l['attribute_type_id'] == 'biolink:knowledge_level':
+                        for idl, l in enumerate(knowledge_graph_edge["attributes"]):
+                            if l["attribute_type_id"] == "biolink:knowledge_level":
                                 epc_found = 1
-                                if l['value'] != 'prediction':
+                                if l["value"] != "prediction":
                                     curated = 1
-                                    df_numpy[idi].extend([l['attribute_type_id'], l['value']])
+                                    df_numpy[idi].extend(
+                                        [l["attribute_type_id"], l["value"]]
+                                    )
                                     break
                         if curated == 1 and epc_found == 1:
                             break
-                        elif curated==0 and epc_found==0:
-                            for idl, l in enumerate(knowledge_graph_edge['sources']):
-                                if l['resource_role'] == 'primary_knowledge_source':
-                                    if l['resource_id'] not in ['infores:arax', 'infores:aragorn', 'infores:biothings-explorer','infores:unsecret-agent','infores:improving-agent', 'infores:cqs']:
+                        elif curated == 0 and epc_found == 0:
+                            for idl, l in enumerate(knowledge_graph_edge["sources"]):
+                                if l["resource_role"] == "primary_knowledge_source":
+                                    if l["resource_id"] not in [
+                                        "infores:arax",
+                                        "infores:aragorn",
+                                        "infores:biothings-explorer",
+                                        "infores:unsecret-agent",
+                                        "infores:improving-agent",
+                                        "infores:cqs",
+                                    ]:
                                         curated = 1
-                                        df_numpy[idi].extend([l['resource_role'], l['resource_id']])
+                                        df_numpy[idi].extend(
+                                            [l["resource_role"], l["resource_id"]]
+                                        )
                                         break
 
-                    if curated==1:
+                    if curated == 1:
                         break
-                if curated==1:
+                if curated == 1:
                     df_numpy[idi].extend(["Curated"])
                     known_list.append(idi)
                 else:
                     publications = extracting_publications(message, i)
-                    df_numpy[idi].extend(["All KLs checked", "All Primary Knowledge Sources Checked"])
+                    df_numpy[idi].extend(
+                        ["All KLs checked", "All Primary Knowledge Sources Checked"]
+                    )
                     df_numpy[idi].append(f"{publications}")
                     unknown_list.append(idi)
 
-
             else:
-                df_numpy[idi].extend(["Incorrect Category of Result", "Incorrect Category of Result", "Incorrect Category of Result"])
+                df_numpy[idi].extend(
+                    [
+                        "Incorrect Category of Result",
+                        "Incorrect Category of Result",
+                        "Incorrect Category of Result",
+                    ]
+                )
 
-
-            if df_numpy[idi][4]==[] or df_numpy[idi][4]=='Curated' or df_numpy[idi][4]=='Incorrect Category of Result':
+            if (
+                df_numpy[idi][4] == []
+                or df_numpy[idi][4] == "Curated"
+                or df_numpy[idi][4] == "Incorrect Category of Result"
+            ):
                 df_numpy[idi].extend(["No Recency Score"])
                 novelty_score_rec.append(0)
             else:
                 number_of_publ = len(publications)
-                if number_of_publ!=0:
+                if number_of_publ != 0:
                     try:
-                        response_pub = get_publication_info(
-                            publications
-                        )
+                        response_pub = get_publication_info(publications)
                         if not response_pub:
                             age_oldest = np.nan
                         else:
@@ -375,7 +438,9 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
                     except ConnectionError as e:
                         age_oldest = np.nan
                     if not np.isnan(age_oldest):
-                        recency_val = recency_function_exp(number_of_publ, age_oldest, 100, 50)
+                        recency_val = recency_function_exp(
+                            number_of_publ, age_oldest, 100, 50
+                        )
                         df_numpy[idi].extend([recency_val])
                         novelty_score_rec.append(recency_val)
                     else:
@@ -387,61 +452,97 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
         recency_done = time.time()
         print(f"Recency Time: {recency_done-start}")
         if result_id_cat in ["biolink:Protein", "biolink:Gene"]:
-            column_list = ['Query ID', 'Result ID', 'Location 1', 'Location 2', 'Curated or not ?', 'Recency Score',
-                           'Gene Distinctiveness', 'TDLs', 'novelty_score']
+            column_list = [
+                "Query ID",
+                "Result ID",
+                "Location 1",
+                "Location 2",
+                "Curated or not ?",
+                "Recency Score",
+                "Gene Distinctiveness",
+                "TDLs",
+                "novelty_score",
+            ]
 
-            map_result = get_gene_nmf_novelty_for_gene_list(list_input_genes=result_ids_list, log=True)
-            map_result_keys = list(map_result['gene_results'].keys())
-            for idi, i in enumerate(message['results']):
+            map_result = get_gene_nmf_novelty_for_gene_list(
+                list_input_genes=result_ids_list, log=True
+            )
+            map_result_keys = list(map_result["gene_results"].keys())
+            for idi, i in enumerate(message["results"]):
                 if idi in unknown_list:
-                    node_binding_keys = list(i['node_bindings'].keys())
-                    if i['node_bindings'][node_binding_keys[0]][0]['id'] == query_id_node:
-                        res = i['node_bindings'][node_binding_keys[1]][0]['id']
+                    node_binding_keys = list(i["node_bindings"].keys())
+                    if (
+                        i["node_bindings"][node_binding_keys[0]][0]["id"]
+                        == query_id_node
+                    ):
+                        res = i["node_bindings"][node_binding_keys[1]][0]["id"]
                     else:
-                        res = i['node_bindings'][node_binding_keys[0]][0]['id']
+                        res = i["node_bindings"][node_binding_keys[0]][0]["id"]
                     if res in map_result_keys:
-                        gene_distinct = 1 - map_result['gene_results'][res]['novelty_score']
+                        gene_distinct = (
+                            1 - map_result["gene_results"][res]["novelty_score"]
+                        )
                         df_numpy[idi].extend([f"{gene_distinct}"])
                         novelty_score_gd.append(gene_distinct)
                     else:
                         df_numpy[idi].extend([f"No Gene Distinctiveness information"])
                         novelty_score_gd.append(0)
 
-                    if message['knowledge_graph']['nodes'][res]['attributes'] == []:
+                    if message["knowledge_graph"]["nodes"][res]["attributes"] == []:
                         df_numpy[idi].extend([f"No TDLs Information"])
                         novelty_score_rec_tdl.append(novelty_score_rec[idi])
                     else:
                         att_found, found = 0, 0
-                        for chk in message['knowledge_graph']['nodes'][res]['attributes']:
-                            if chk['attribute_type_id'] == "biothings_annotations":
+                        for chk in message["knowledge_graph"]["nodes"][res][
+                            "attributes"
+                        ]:
+                            if chk["attribute_type_id"] == "biothings_annotations":
                                 att_found = 1
                                 break
                         if att_found == 1:
-                            attribute_chk = chk['value'][0].keys()
-                            if 'pharos' in attribute_chk:
-                                tdl = chk['value'][0]['pharos']['tdl']
+                            attribute_chk = chk["value"][0].keys()
+                            if "pharos" in attribute_chk:
+                                tdl = chk["value"][0]["pharos"]["tdl"]
                                 df_numpy[idi].extend([f"{tdl}"])
                                 if tdl == "Tdark":
-                                    if novelty_score_rec[idi]==0 and df_numpy[idi][5] == "No Recency Score" and df_numpy[idi][4]!= "Curated":
+                                    if (
+                                        novelty_score_rec[idi] == 0
+                                        and df_numpy[idi][5] == "No Recency Score"
+                                        and df_numpy[idi][4] != "Curated"
+                                    ):
                                         novelty_score_rec_tdl.append(0.8)
                                     elif novelty_score_rec[idi] <= 0.4:
                                         novelty_score_rec_tdl.append(0.41)
                                     else:
-                                        novelty_score_rec_tdl.append(novelty_score_rec[idi])
+                                        novelty_score_rec_tdl.append(
+                                            novelty_score_rec[idi]
+                                        )
                                 elif tdl == "Tclin":
-                                    if novelty_score_rec[idi]==0 and df_numpy[idi][5] == "No Recency Score" and df_numpy[idi][4]!= "Curated":
+                                    if (
+                                        novelty_score_rec[idi] == 0
+                                        and df_numpy[idi][5] == "No Recency Score"
+                                        and df_numpy[idi][4] != "Curated"
+                                    ):
                                         novelty_score_rec_tdl.append(0.2)
                                     elif novelty_score_rec[idi] > 0.5:
                                         novelty_score_rec_tdl.append(0.5)
                                     else:
-                                        novelty_score_rec_tdl.append(novelty_score_rec[idi])
-                                elif tdl=="Tbio" or tdl=="Tchem":
-                                    if novelty_score_rec[idi] == 0 and df_numpy[idi][5] == "No Recency Score" and df_numpy[idi][4]!= "Curated":
+                                        novelty_score_rec_tdl.append(
+                                            novelty_score_rec[idi]
+                                        )
+                                elif tdl == "Tbio" or tdl == "Tchem":
+                                    if (
+                                        novelty_score_rec[idi] == 0
+                                        and df_numpy[idi][5] == "No Recency Score"
+                                        and df_numpy[idi][4] != "Curated"
+                                    ):
                                         novelty_score_rec_tdl.append(0.5)
                                     elif novelty_score_rec[idi] > 0.6:
                                         novelty_score_rec_tdl.append(0.6)
                                     else:
-                                        novelty_score_rec_tdl.append(novelty_score_rec[idi])
+                                        novelty_score_rec_tdl.append(
+                                            novelty_score_rec[idi]
+                                        )
                                 found = 1
                             if found == 0:
                                 df_numpy[idi].extend([f"No TDLs Information"])
@@ -451,7 +552,6 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
                             df_numpy[idi].extend([f"No TDLs Information"])
                             novelty_score_rec_tdl.append(novelty_score_rec[idi])
 
-
                 else:
                     df_numpy[idi].extend([f"Incorrect Category of Result"])
                     df_numpy[idi].extend([f"Incorrect Category of Result"])
@@ -459,63 +559,101 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
                     novelty_score_rec_tdl.append(0)
 
             for c in range(len(novelty_score_rec)):
-                novelty_score_final = wt_rec_tdl * novelty_score_rec_tdl[c] + wt_gd * novelty_score_gd[c]
+                novelty_score_final = (
+                    wt_rec_tdl * novelty_score_rec_tdl[c] + wt_gd * novelty_score_gd[c]
+                )
                 df_numpy[c].append(novelty_score_final)
 
-        elif result_id_cat in ["biolink:SmallMolecule", "biolink:Drug", "biolink:ChemicalEntity", "biolink:MolecularMixture", "biolink:MolecularEntity"]:
-            column_list = ['Query ID', 'Result ID', 'Location 1', 'Location 2', 'Curated or not ?', 'Recency Score', 'Molecular Similarity', 'Clinical Information', 'novelty_score']
+        elif result_id_cat in [
+            "biolink:SmallMolecule",
+            "biolink:Drug",
+            "biolink:ChemicalEntity",
+            "biolink:MolecularMixture",
+            "biolink:MolecularEntity",
+        ]:
+            column_list = [
+                "Query ID",
+                "Result ID",
+                "Location 1",
+                "Location 2",
+                "Curated or not ?",
+                "Recency Score",
+                "Molecular Similarity",
+                "Clinical Information",
+                "novelty_score",
+            ]
 
-            similarity_map = await molecular_sim(known_list, unknown_list, message, query_id_node)
+            similarity_map = await molecular_sim(
+                known_list, unknown_list, message, query_id_node
+            )
             similarity_map_keys = list(similarity_map.keys())
-            for idi, i in enumerate(message['results']):
+            for idi, i in enumerate(message["results"]):
                 if idi in unknown_list:
-                    node_binding_keys = list(i['node_bindings'].keys())
-                    if i['node_bindings'][node_binding_keys[0]][0]['id'] == query_id_node:
-                        res = i['node_bindings'][node_binding_keys[1]][0]['id']
+                    node_binding_keys = list(i["node_bindings"].keys())
+                    if (
+                        i["node_bindings"][node_binding_keys[0]][0]["id"]
+                        == query_id_node
+                    ):
+                        res = i["node_bindings"][node_binding_keys[1]][0]["id"]
                     else:
-                        res = i['node_bindings'][node_binding_keys[0]][0]['id']
+                        res = i["node_bindings"][node_binding_keys[0]][0]["id"]
 
-                    if res in similarity_map_keys and similarity_map[res]!=[]:
+                    if res in similarity_map_keys and similarity_map[res] != []:
                         similarity = similarity_map[res][0][1]
-                        chem_distinct = 1-similarity
+                        chem_distinct = 1 - similarity
                         df_numpy[idi].extend([f"{chem_distinct}"])
                         novelty_score_md.append(chem_distinct)
                     else:
                         df_numpy[idi].extend([f"{np.nan}"])
                         novelty_score_md.append(0)
 
-                    if message['knowledge_graph']['nodes'][res]['attributes'] == []:
+                    if message["knowledge_graph"]["nodes"][res]["attributes"] == []:
                         df_numpy[idi].extend([f"No clinical Information"])
                         novelty_score_rec_clin.append(novelty_score_rec[idi])
                     else:
                         att_found, found = 0, 0
-                        for chk in message['knowledge_graph']['nodes'][res]['attributes']:
-                            if chk['attribute_type_id'] == "biothings_annotations":
+                        for chk in message["knowledge_graph"]["nodes"][res][
+                            "attributes"
+                        ]:
+                            if chk["attribute_type_id"] == "biothings_annotations":
                                 att_found = 1
                                 break
                         if att_found == 1:
-                            attribute_chk = chk['value'][0].keys()
-                            if 'clinical_approval' in attribute_chk:
-                                clinical_approval_list = chk['value'][0]['clinical_approval']
+                            attribute_chk = chk["value"][0].keys()
+                            if "clinical_approval" in attribute_chk:
+                                clinical_approval_list = chk["value"][0][
+                                    "clinical_approval"
+                                ]
                                 for idj, j in enumerate(clinical_approval_list):
-                                    clinical_app_key = list(j['disease'].keys())[0]
-                                    if j['disease'][clinical_app_key] == query_id_node:
+                                    clinical_app_key = list(j["disease"].keys())[0]
+                                    if j["disease"][clinical_app_key] == query_id_node:
                                         found = 1
-                                        df_numpy[idi].extend([j['status']])
+                                        df_numpy[idi].extend([j["status"]])
                                         novelty_score_rec_clin.append(0)
                                         novelty_score_md[idi] = 0
                                         break
 
                             if found == 0:
-                                if 'clinical_trials' in attribute_chk:
-                                    clinical_trials_list = chk['value'][0]['clinical_trials']
+                                if "clinical_trials" in attribute_chk:
+                                    clinical_trials_list = chk["value"][0][
+                                        "clinical_trials"
+                                    ]
                                     phase_trials = []
                                     for idj, j in enumerate(clinical_trials_list):
-                                        clinical_app_key = list(j[0]['disease'].keys())[0]
-                                        if j[0]['disease'][clinical_app_key] == query_id_node:
+                                        clinical_app_key = list(j[0]["disease"].keys())[
+                                            0
+                                        ]
+                                        if (
+                                            j[0]["disease"][clinical_app_key]
+                                            == query_id_node
+                                        ):
                                             for k in j:
-                                                if "not_provided" not in k['phase']:
-                                                    phase_trials.append(k['phase'].lstrip("clinical_trial_phase"))
+                                                if "not_provided" not in k["phase"]:
+                                                    phase_trials.append(
+                                                        k["phase"].lstrip(
+                                                            "clinical_trial_phase"
+                                                        )
+                                                    )
                                     if len(phase_trials) > 0:
                                         phase_trials.sort(reverse=True)
                                         df_numpy[idi].extend([phase_trials[0]])
@@ -523,13 +661,21 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
                                             novelty_score_rec_clin.append(0)
                                             novelty_score_md[idi] = 0
                                         elif "3" in phase_trials[0]:
-                                            novelty_score_rec_clin.append(novelty_score_rec[idi]*0.2)
+                                            novelty_score_rec_clin.append(
+                                                novelty_score_rec[idi] * 0.2
+                                            )
                                         elif "2" in phase_trials[0]:
-                                            novelty_score_rec_clin.append(novelty_score_rec[idi]*0.6)
+                                            novelty_score_rec_clin.append(
+                                                novelty_score_rec[idi] * 0.6
+                                            )
                                         elif "1" in phase_trials[0]:
-                                            novelty_score_rec_clin.append(novelty_score_rec[idi]*0.8)
+                                            novelty_score_rec_clin.append(
+                                                novelty_score_rec[idi] * 0.8
+                                            )
                                         else:
-                                            novelty_score_rec_clin.append(novelty_score_rec[idi])
+                                            novelty_score_rec_clin.append(
+                                                novelty_score_rec[idi]
+                                            )
                                         found = 1
                             if found == 0:
                                 df_numpy[idi].extend([f"No clinical information"])
@@ -545,18 +691,48 @@ async def compute_novelty(message, logger, wt_rec_tdl = 0.3, wt_gd = 0.7, wt_rec
                     novelty_score_md.append(0)
                     novelty_score_rec_clin.append(0)
             for c in range(len(novelty_score_rec)):
-                novelty_score_final = wt_rec_clin * novelty_score_rec_clin[c] + wt_md * novelty_score_md[c]
+                novelty_score_final = (
+                    wt_rec_clin * novelty_score_rec_clin[c]
+                    + wt_md * novelty_score_md[c]
+                )
                 df_numpy[c].append(novelty_score_final)
         print(f"Similarity Computation Time: {time.time()-recency_done}")
-        df_numpy = pd.DataFrame(df_numpy, columns= column_list)
+        df_numpy = pd.DataFrame(df_numpy, columns=column_list)
 
     except Exception as e:
         print(f"Error Encountered: {e}")
-        if result_id_cat in ["biolink:SmallMolecule", "biolink:Drug", "biolink:ChemicalEntity", "biolink:MolecularMixture", "biolink:MolecularEntity"]:
-            column_list = ['Query ID', 'Result ID', 'Location 1', 'Location 2', 'Curated or not ?', 'Recency Score', 'Molecular Similarity', 'Clinical Information', 'novelty_score']
+        if result_id_cat in [
+            "biolink:SmallMolecule",
+            "biolink:Drug",
+            "biolink:ChemicalEntity",
+            "biolink:MolecularMixture",
+            "biolink:MolecularEntity",
+        ]:
+            column_list = [
+                "Query ID",
+                "Result ID",
+                "Location 1",
+                "Location 2",
+                "Curated or not ?",
+                "Recency Score",
+                "Molecular Similarity",
+                "Clinical Information",
+                "novelty_score",
+            ]
         elif result_id_cat in ["biolink:Protein", "biolink:Gene"]:
-            column_list = ['Query ID', 'Result ID', 'Location 1', 'Location 2', 'Curated or not ?', 'Recency Score',
-                           'Gene Distinctiveness', 'TDLs', 'novelty_score']
-        df_numpy = pd.DataFrame([[0]*len(column_list)]*len(message['results']), columns = column_list)
+            column_list = [
+                "Query ID",
+                "Result ID",
+                "Location 1",
+                "Location 2",
+                "Curated or not ?",
+                "Recency Score",
+                "Gene Distinctiveness",
+                "TDLs",
+                "novelty_score",
+            ]
+        df_numpy = pd.DataFrame(
+            [[0] * len(column_list)] * len(message["results"]), columns=column_list
+        )
 
     return df_numpy

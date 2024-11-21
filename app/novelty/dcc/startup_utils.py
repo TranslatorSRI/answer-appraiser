@@ -1,4 +1,3 @@
-
 # LICENSE
 # Copyright 2024 Flannick Lab
 
@@ -45,11 +44,12 @@ vector_genes = None
 map_conf = None
 logger = get_logger(__name__)
 
+
 # methods
 def load_conf(dir=DIR_CONF, log=True):
-    '''
+    """
     will load the configuration
-    '''
+    """
     file_conf = dir + FILE_CONF
     json_data = None
 
@@ -59,15 +59,16 @@ def load_conf(dir=DIR_CONF, log=True):
 
     # load the map
     with open(file_conf) as f:
-         json_data = json.load(f)
+        json_data = json.load(f)
 
     # return
     return json_data
 
+
 def get_conf():
-    '''
+    """
     will return the configuration
-    '''
+    """
     if not map_conf:
         map_conf = load_conf()
 
