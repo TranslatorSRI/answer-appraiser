@@ -2,18 +2,13 @@ import pandas as pd
 from datetime import date
 import httpx
 import numpy as np
-import traceback
-import json
 from rdkit import Chem
 from rdkit import DataStructs
 from rdkit.Chem import rdFingerprintGenerator
-import os, sys
 import time
-import asyncio
-import requests
 import redis
 from .gene_nmf_adapter import get_gene_nmf_novelty_for_gene_list
-from .dcc import dcc_utils as dutils
+from ..config import settings
 
 """
 This script computes the novelty score for a list of results obtained for a 1-H response using publications from 5 ARAs.
@@ -144,7 +139,12 @@ async def molecular_sim(known, unknown, message, query_id):
 
 def get_publication_info(pub_id):
     # Connect to Redis
-    r = redis.Redis(host='localhost', port=6379, db=0)
+    r = redis.Redis(
+        host=settings.redis_host,
+        port=settings.redis_port,
+        db=1,
+        password=settings.redis_password,
+    )
     pmid_years = []
     for key in pub_id:
         val = r.get(key)
