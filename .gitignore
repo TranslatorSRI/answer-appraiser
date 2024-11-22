@@ -15,5 +15,9 @@ logs/*
 *.log
 kgx/
 data/
+.idea
+
+# personal folders
 test_queries/
 scripts/
+create_pubmed_database/

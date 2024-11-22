@@ -39,7 +39,7 @@ async def get_novelty(message, logger):
     novelty_df = await compute_novelty(message, logger)
     novelty_dict = novelty_df.to_dict(orient="index")
     novelty_scores = {
-        node["drug"]: node["novelty_score"] for node in novelty_dict.values()
+        node["Result ID"]: node["novelty_score"] for node in novelty_dict.values()
     }
     return novelty_scores
 
@@ -48,10 +48,10 @@ async def get_ordering_components(message, logger):
     logger.debug(f"Computing scores for {len(message['results'])} results")
     db_conn = redis.Redis(connection_pool=redis_pool)
     novelty_scores = {}
-    # try:
-    #     novelty_scores = await get_novelty(message, logger)
-    # except Exception:
-    #     logger.error(f"Novelty score failed: {traceback.format_exc()}")
+    try:
+        novelty_scores = await get_novelty(message, logger)
+    except Exception:
+        logger.error(f"Novelty score failed: {traceback.format_exc()}")
     for result in tqdm(message.get("results") or []):
         confidence = 0.0
         try:
@@ -73,8 +73,8 @@ async def get_ordering_components(message, logger):
             "clinical_evidence": clinical_evidence_score,
             "novelty": 0.0,
         }
-        # for node_bindings in result.get("node_bindings", {}).values():
-        #     for node_binding in node_bindings:
-        #         result["ordering_components"]["novelty"] = novelty_scores.get(
-        #             node_binding["id"], 0.0
-        #         )
+        for node_bindings in result.get("node_bindings", {}).values():
+            for node_binding in node_bindings:
+                result["ordering_components"]["novelty"] = novelty_scores.get(
+                    node_binding["id"], 0.0
+                )

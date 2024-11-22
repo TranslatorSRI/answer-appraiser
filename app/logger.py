@@ -77,3 +77,4 @@ def setup_logger():
     config.dictConfig(logging_config)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
