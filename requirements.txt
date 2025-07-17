@@ -8,7 +8,7 @@ opentelemetry-exporter-jaeger
 opentelemetry-instrumentation-httpx
 pandas
 rdkit
-reasoner-pydantic
+reasoner-pydantic==5.1.1
 redis
 scipy
 scikit-learn
