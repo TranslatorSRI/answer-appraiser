@@ -8,7 +8,6 @@ opentelemetry-exporter-jaeger
 opentelemetry-instrumentation-httpx
 pandas
 rdkit
-reasoner-pydantic==5.1.1
 redis
 scipy
 scikit-learn
