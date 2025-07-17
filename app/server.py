@@ -1,10 +1,10 @@
-import gzip
 import json
 import logging
 import os
 import redis
 import traceback
 import warnings
+import zstandard
 
 from fastapi import HTTPException, status, Request
 from fastapi.responses import JSONResponse, Response
@@ -158,7 +158,7 @@ async def sync_get_appraisal(request: Request):
     if request.headers.get("content-encoding") == "gzip":
         try:
             raw_body = await request.body()
-            query = json.loads(gzip.decompress(raw_body))
+            query = json.loads(zstandard.decompress(raw_body))
             compressed = True
         except Exception:
             return Response("Invalid request. Failed to decompress and ingest.", 400)
@@ -180,7 +180,7 @@ async def sync_get_appraisal(request: Request):
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
     if compressed:
-        query = gzip.compress(json.dumps(query).encode())
+        query = zstandard.compress(json.dumps(query).encode())
     else:
         query = json.dumps(query)
     logger.info("Done appraising")
