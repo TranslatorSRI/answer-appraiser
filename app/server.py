@@ -22,10 +22,10 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="SRI Answer Appraiser",
-    version="0.7.0",
+    version="0.8.0",
     terms_of_service="",
     description="SRI service that provides metrics for scoring and ordering of results",
-    trapi="1.5.0",
+    trapi="1.6.0",
     biolink_version="4.2.0",
     contact={
         "name": "Max Wang",
