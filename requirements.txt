@@ -8,9 +8,9 @@ opentelemetry-exporter-jaeger
 opentelemetry-instrumentation-httpx
 pandas
 rdkit
-reasoner-pydantic
 redis
 scipy
 scikit-learn
 tqdm
 uvicorn
+zstandard

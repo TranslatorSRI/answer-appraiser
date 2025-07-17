@@ -1,10 +1,10 @@
-import gzip
 import json
 import logging
 import os
 import redis
 import traceback
 import warnings
+import zstandard
 
 from fastapi import HTTPException, status, Request
 from fastapi.responses import JSONResponse, Response
@@ -22,10 +22,10 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="SRI Answer Appraiser",
-    version="0.7.0",
+    version="0.8.0",
     terms_of_service="",
     description="SRI service that provides metrics for scoring and ordering of results",
-    trapi="1.5.0",
+    trapi="1.6.0",
     biolink_version="4.2.0",
     contact={
         "name": "Max Wang",
@@ -155,10 +155,10 @@ async def sync_get_appraisal(request: Request):
     logger = get_logger(qid, "INFO")
     logger.info("Starting sync appraisal")
     compressed = False
-    if request.headers.get("content-encoding") == "gzip":
+    if request.headers.get("content-encoding") == "zstd":
         try:
             raw_body = await request.body()
-            query = json.loads(gzip.decompress(raw_body))
+            query = json.loads(zstandard.decompress(raw_body))
             compressed = True
         except Exception:
             return Response("Invalid request. Failed to decompress and ingest.", 400)
@@ -180,7 +180,7 @@ async def sync_get_appraisal(request: Request):
     except Exception:
         logger.error(f"Something went wrong while appraising: {traceback.format_exc()}")
     if compressed:
-        query = gzip.compress(json.dumps(query).encode())
+        query = zstandard.compress(json.dumps(query).encode())
     else:
         query = json.dumps(query)
     logger.info("Done appraising")
