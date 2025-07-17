@@ -155,7 +155,7 @@ async def sync_get_appraisal(request: Request):
     logger = get_logger(qid, "INFO")
     logger.info("Starting sync appraisal")
     compressed = False
-    if request.headers.get("content-encoding") == "gzip":
+    if request.headers.get("content-encoding") == "zstd":
         try:
             raw_body = await request.body()
             query = json.loads(zstandard.decompress(raw_body))
