@@ -9,12 +9,14 @@ class Settings(BaseSettings):
     openapi_server_location: str = "RENCI"
     trapi_version: str = "1.5.0"
     redis_host: str = "localhost"
-    redis_port: int = 6379
+    redis_port: int = 6380
     redis_password: str = "supersecretpassword"
 
-    jaeger_enabled: str = "True"
+    jaeger_enabled: bool = False
     jaeger_host: str = "jaeger"
     jaeger_port: int = 6831
+    otel_service_name: str = "ANSWER-APPRAISER"
+    otel_use_console_exporter: bool = False
 
     class Config:
         env_file = ".env"

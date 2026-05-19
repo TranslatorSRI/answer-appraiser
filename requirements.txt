@@ -2,10 +2,10 @@ fastapi
 gunicorn
 httpx
 numpy
-opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
 opentelemetry-instrumentation-fastapi
-opentelemetry-exporter-jaeger
 opentelemetry-instrumentation-httpx
+opentelemetry-sdk
 pandas
 rdkit
 redis

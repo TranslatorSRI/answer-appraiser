@@ -22,7 +22,7 @@ LOGGER = logging.getLogger(__name__)
 
 openapi_args = dict(
     title="SRI Answer Appraiser",
-    version="0.8.0",
+    version="0.8.1",
     terms_of_service="",
     description="SRI service that provides metrics for scoring and ordering of results",
     trapi="1.6.0",
@@ -53,40 +53,6 @@ APP.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-if settings.jaeger_enabled == "True":
-    LOGGER.info("Starting up Jaeger")
-
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry import trace
-    from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-    from opentelemetry.sdk.resources import (
-        SERVICE_NAME,
-        Resource,
-    )
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-
-    # httpx connections need to be open a little longer by the otel decorators
-    # but some libs display warnings of resource being unclosed.
-    # these supresses such warnings.
-    logging.captureWarnings(capture=True)
-    warnings.filterwarnings("ignore", category=ResourceWarning)
-    service_name = os.environ.get("OTEL_SERVICE_NAME", "ANSWER-APPRAISER")
-    jaeger_exporter = JaegerExporter(
-        agent_host_name=settings.jaeger_host,
-        agent_port=int(settings.jaeger_port),
-    )
-    resource = Resource(attributes={SERVICE_NAME: service_name})
-    provider = TracerProvider(resource=resource)
-    processor = BatchSpanProcessor(jaeger_exporter)
-    provider.add_span_processor(processor)
-    trace.set_tracer_provider(provider)
-    FastAPIInstrumentor.instrument_app(
-        APP, tracer_provider=provider, excluded_urls="docs,openapi.json,redis_ready"
-    )
-    HTTPXClientInstrumentor().instrument()
 
 EXAMPLE = {
     "message": {
