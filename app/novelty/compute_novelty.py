@@ -8,7 +8,21 @@ from rdkit.Chem import rdFingerprintGenerator
 import time
 import redis
 from .gene_nmf_adapter import get_gene_nmf_novelty_for_gene_list
+from ..binding_utils import binding_ids
 from ..config import settings
+
+
+def result_node_id(result, query_id_node):
+    """Return the KG id of the non-query (result) node for a TRAPI result.
+
+    Picks the first node-bound Knowledge Graph identifier that is not the
+    queried node. Tolerant of pre-1.5 and 1.5+ TRAPI binding formats.
+    """
+    for binding in result["node_bindings"].values():
+        for kg_id in binding_ids(binding):
+            if kg_id != query_id_node:
+                return kg_id
+    return None
 
 """
 This script computes the novelty score for a list of results obtained for a 1-H response using publications from 5 ARAs.
@@ -114,27 +128,15 @@ async def molecular_sim(known, unknown, message, query_id):
     known_ids = []
     if len(unknown) > 0:
         for drug in unknown:
-            s = list(message["results"][drug]["node_bindings"].keys())
-            if message["results"][drug]["node_bindings"][s[0]][0]["id"] == query_id:
-                unknown_ids.append(
-                    message["results"][drug]["node_bindings"][s[1]][0]["id"]
-                )
-            else:
-                unknown_ids.append(
-                    message["results"][drug]["node_bindings"][s[0]][0]["id"]
-                )
+            unknown_ids.append(
+                result_node_id(message["results"][drug], query_id)
+            )
 
     if len(known) > 0:
         for drug in known:
-            s = list(message["results"][drug]["node_bindings"].keys())
-            if message["results"][drug]["node_bindings"][s[0]][0]["id"] == query_id:
-                known_ids.append(
-                    message["results"][drug]["node_bindings"][s[1]][0]["id"]
-                )
-            else:
-                known_ids.append(
-                    message["results"][drug]["node_bindings"][s[0]][0]["id"]
-                )
+            known_ids.append(
+                result_node_id(message["results"][drug], query_id)
+            )
 
     smile_unkown = await mol_to_smile_molpro(unknown_ids)
     smile_known = await mol_to_smile_molpro(known_ids)
@@ -225,10 +227,10 @@ def extracting_publications(message, result):
     publications = []
     for idi, i in enumerate(result["analyses"]):
         edge_keys = list(i["edge_bindings"].keys())
-        for idj, j in enumerate(i["edge_bindings"][edge_keys[0]]):
+        for edge_id in binding_ids(i["edge_bindings"][edge_keys[0]]):
             aux_graph, edges = [], []
             for idl, l in enumerate(
-                message["knowledge_graph"]["edges"][j["id"]]["attributes"]
+                message["knowledge_graph"]["edges"][edge_id]["attributes"]
             ):
                 if l["attribute_type_id"] == "biolink:publications":
                     publications.extend(l["value"])
@@ -271,19 +273,17 @@ def extract_results(message, unknown, known):
         if idi in unknown:
             results.append([])
             for idj, j in enumerate(i["analyses"]):
-                for idk, k in enumerate(
-                    j["edge_bindings"][list(j["edge_bindings"].keys())[0]]
-                ):
-                    results[ukid].append(k["id"])
+                edge_key = list(j["edge_bindings"].keys())[0]
+                for edge_id in binding_ids(j["edge_bindings"][edge_key]):
+                    results[ukid].append(edge_id)
             ukid += 1
 
         elif idi in known:
             results_known.append([])
             for idj, j in enumerate(i["analyses"]):
-                for idk, k in enumerate(
-                    j["edge_bindings"][list(j["edge_bindings"].keys())[0]]
-                ):
-                    results_known[kid].append(k["id"])
+                edge_key = list(j["edge_bindings"].keys())[0]
+                for edge_id in binding_ids(j["edge_bindings"][edge_key]):
+                    results_known[kid].append(edge_id)
             kid += 1
     return results, results_known
 
@@ -335,11 +335,7 @@ async def compute_novelty(
         novelty_score_rec_tdl, novelty_score_rec_clin = [], []
         for idi, i in enumerate(message["results"]):
             curated = 0
-            node_binding_keys = list(i["node_bindings"].keys())
-            if i["node_bindings"][node_binding_keys[0]][0]["id"] == query_id_node:
-                result_id_node = i["node_bindings"][node_binding_keys[1]][0]["id"]
-            else:
-                result_id_node = i["node_bindings"][node_binding_keys[0]][0]["id"]
+            result_id_node = result_node_id(i, query_id_node)
             df_numpy.append([query_id_node, result_id_node])
             result_node_cat = message["knowledge_graph"]["nodes"][result_id_node][
                 "categories"
@@ -363,19 +359,31 @@ async def compute_novelty(
                 correct_results.append(idi)
                 for idj, j in enumerate(i["analyses"]):
                     edge_keys = list(j["edge_bindings"].keys())
-                    for idk, k in enumerate(j["edge_bindings"][edge_keys[0]]):
+                    for edge_id in binding_ids(j["edge_bindings"][edge_keys[0]]):
                         knowledge_graph_edge = message["knowledge_graph"]["edges"][
-                            k["id"]
+                            edge_id
                         ]
+                        # TRAPI >= 1.5.0: knowledge_level is a first-class,
+                        # required Edge property. Fall back to the pre-1.5 EPC
+                        # attribute representation when it is absent.
+                        knowledge_level = knowledge_graph_edge.get("knowledge_level")
                         epc_found = 0
-                        for idl, l in enumerate(knowledge_graph_edge["attributes"]):
-                            if l["attribute_type_id"] == "biolink:knowledge_level":
-                                epc_found = 1
-                                if l["value"] != "prediction":
-                                    curated = 1
-                                    df_numpy[idi].extend(
-                                        [l["attribute_type_id"], l["value"]]
-                                    )
+                        if knowledge_level is not None:
+                            epc_found = 1
+                            if knowledge_level != "prediction":
+                                curated = 1
+                                df_numpy[idi].extend(
+                                    ["biolink:knowledge_level", knowledge_level]
+                                )
+                        else:
+                            for idl, l in enumerate(knowledge_graph_edge["attributes"]):
+                                if l["attribute_type_id"] == "biolink:knowledge_level":
+                                    epc_found = 1
+                                    if l["value"] != "prediction":
+                                        curated = 1
+                                        df_numpy[idi].extend(
+                                            [l["attribute_type_id"], l["value"]]
+                                        )
                                     break
                         if curated == 1 and epc_found == 1:
                             break
@@ -470,14 +478,7 @@ async def compute_novelty(
             map_result_keys = list(map_result["gene_results"].keys())
             for idi, i in enumerate(message["results"]):
                 if idi in unknown_list:
-                    node_binding_keys = list(i["node_bindings"].keys())
-                    if (
-                        i["node_bindings"][node_binding_keys[0]][0]["id"]
-                        == query_id_node
-                    ):
-                        res = i["node_bindings"][node_binding_keys[1]][0]["id"]
-                    else:
-                        res = i["node_bindings"][node_binding_keys[0]][0]["id"]
+                    res = result_node_id(i, query_id_node)
                     if res in map_result_keys:
                         gene_distinct = (
                             1 - map_result["gene_results"][res]["novelty_score"]
@@ -589,14 +590,7 @@ async def compute_novelty(
             similarity_map_keys = list(similarity_map.keys())
             for idi, i in enumerate(message["results"]):
                 if idi in unknown_list:
-                    node_binding_keys = list(i["node_bindings"].keys())
-                    if (
-                        i["node_bindings"][node_binding_keys[0]][0]["id"]
-                        == query_id_node
-                    ):
-                        res = i["node_bindings"][node_binding_keys[1]][0]["id"]
-                    else:
-                        res = i["node_bindings"][node_binding_keys[0]][0]["id"]
+                    res = result_node_id(i, query_id_node)
 
                     if res in similarity_map_keys and similarity_map[res] != []:
                         similarity = similarity_map[res][0][1]

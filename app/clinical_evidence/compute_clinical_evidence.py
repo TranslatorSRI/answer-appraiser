@@ -5,6 +5,8 @@ import logging
 import numpy as np
 import redis
 
+from ..binding_utils import binding_ids
+
 
 def compute_clinical_evidence(
     result: dict, message, logger: logging.Logger, db_conn: redis.Redis
@@ -18,10 +20,10 @@ def compute_clinical_evidence(
     found_edges = []
     # loop over all analyses in the given result and append any clinical kp edges to found_edges
     for analysis in result.get("analyses") or []:
-        for edge_bindings in analysis.get("edge_bindings", {}).values():
-            for edge_binding in edge_bindings:
+        for edge_binding in analysis.get("edge_bindings", {}).values():
+            for edge_id in binding_ids(edge_binding):
                 try:
-                    kg_edge = message["knowledge_graph"]["edges"][edge_binding["id"]]
+                    kg_edge = message["knowledge_graph"]["edges"][edge_id]
                 except KeyError:
                     # this is malformed TRAPI
                     logger.error("malformed TRAPI")
