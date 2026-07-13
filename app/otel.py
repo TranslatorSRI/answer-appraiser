@@ -10,7 +10,7 @@ https://oneuptime.com/blog/post/2026-02-06-troubleshoot-fastapi-uvicorn-reload/v
 def setup_otel(worker_pid=None):
     from .config import settings
 
-    if settings.jaeger_enabled in ("false", "False"):
+    if not settings.jaeger_enabled:
         return
 
     from opentelemetry import trace

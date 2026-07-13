@@ -1,5 +1,5 @@
 # gunicorn.conf.py
-# Thin shim: real OTEL setup lives in PLATER/services/otel.py.
+# Thin shim: real OTEL setup lives in app/otel.py.
 # It must run in post_fork so OTEL background threads/channels are created
 # in the worker process, not the master.
 
