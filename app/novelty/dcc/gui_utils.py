@@ -33,7 +33,6 @@
 from .matrix_utils import sum_of_gene_row
 from .dcc_utils import get_logger
 
-
 # constants
 logger = get_logger(__name__)
 

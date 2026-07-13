@@ -16,7 +16,6 @@ from .logger import setup_logger, get_logger
 from .trapi import TRAPI
 from .ordering_components import get_ordering_components
 
-
 setup_logger()
 LOGGER = logging.getLogger(__name__)
 
@@ -94,19 +93,21 @@ EXAMPLE = {
                         }
                     ],
                     "attributes": [],
+                    "knowledge_level": "knowledge_assertion",
+                    "agent_type": "manual_agent",
                 }
             },
         },
         "results": [
             {
                 "node_bindings": {
-                    "n0": [{"id": "MESH:D008687", "attributes": []}],
-                    "n1": [{"id": "MONDO:0005148", "attributes": []}],
+                    "n0": {"ids": ["MESH:D008687"]},
+                    "n1": {"ids": ["MONDO:0005148"]},
                 },
                 "analyses": [
                     {
                         "resource_id": "kp0",
-                        "edge_bindings": {"n0n1": [{"id": "n0n1", "attributes": []}]},
+                        "edge_bindings": {"n0n1": {"ids": ["n0n1"]}},
                     }
                 ],
             }

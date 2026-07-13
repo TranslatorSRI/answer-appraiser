@@ -35,7 +35,6 @@ import json
 
 from .dcc_utils import get_logger
 
-
 # constants
 logger = get_logger(__name__)
 

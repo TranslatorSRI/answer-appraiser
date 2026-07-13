@@ -8,7 +8,6 @@ from .config import settings
 from .clinical_evidence.compute_clinical_evidence import compute_clinical_evidence
 from .novelty.compute_novelty import compute_novelty
 
-
 redis_pool = redis.ConnectionPool(
     host=settings.redis_host,
     port=settings.redis_port,
@@ -73,8 +72,7 @@ async def get_ordering_components(message, logger):
             "clinical_evidence": clinical_evidence_score,
             "novelty": 0.0,
         }
-        for node_bindings in result.get("node_bindings", {}).values():
-            for node_binding in node_bindings:
-                result["ordering_components"]["novelty"] = novelty_scores.get(
-                    node_binding["id"], 0.0
-                )
+        for binding in result.get("node_bindings", {}).values():
+            for kg_id in binding["ids"]:
+                if kg_id in novelty_scores:
+                    result["ordering_components"]["novelty"] = novelty_scores[kg_id]

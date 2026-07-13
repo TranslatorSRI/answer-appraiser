@@ -1,13 +1,15 @@
 """Script for combining multiple KGX node and edge files."""
 
+from datetime import datetime
 import glob
 import json
 import jsonlines
-
+from tqdm import tqdm
 
 if __name__ == "__main__":
-    node_files = glob.glob("./kgx/*_nodes.jsonl")
-    edge_files = glob.glob("./kgx/*_edges.jsonl")
+    time = datetime.now().strftime("%Y_%m_%d")
+    node_files = glob.glob("./kgx/full/*_nodes.jsonl")
+    edge_files = glob.glob("./kgx/full/*_edges.jsonl")
 
     node_ids = set()
     nodes = {}
@@ -19,7 +21,7 @@ if __name__ == "__main__":
                 if node["id"] not in node_ids:
                     nodes[node["id"]] = node
 
-    with open("nodes_merged.json", "w") as f:
+    with open(f"kgx/nodes_merged_{time}.json", "w") as f:
         json.dump(nodes, f, indent=2)
 
     supported_categories = ["biolink:Drug", "biolink:ChemicalEntity", "biolink:Disease"]
@@ -29,7 +31,8 @@ if __name__ == "__main__":
     for edge_file in edge_files:
         print(f"merging {edge_file}")
         with jsonlines.open(edge_file) as reader:
-            for edge in reader:
+            print("loaded edge file")
+            for edge in tqdm(reader):
                 # get subject node
                 if type(edge["subject"]) == dict:
                     # from ehr
@@ -133,6 +136,23 @@ if __name__ == "__main__":
                                 "log_odds_analysis_result"
                             ].get("total_sample_size", 0)
 
+                        elif (
+                            edge.get("primary_knowledge_source")
+                            == "infores:isb-EHRMLA-data"
+                        ):
+                            # from ehr may treat
+                            save_edge["supporting_data_source"] = (
+                                "infores:isb-EHRMLA-data"
+                            )
+                            save_edge["predicate"] = edge["predicate"]
+                            save_edge["log_odds_ratio"] = edge.get("log_odds_ratio", 0)
+                            save_edge["log_odds_ratio_95_ci"] = edge.get(
+                                "log_odds_ratio_95_ci", [0, 0]
+                            )
+                            save_edge["total_sample_size"] = edge.get(
+                                "total_sample_size", 0
+                            )
+
                         if save_edge["log_odds_ratio"] > 10:
                             save_edge["log_odds_ratio"] = 10
                             save_edge["log_odds_ratio_95_ci"] = [10, 10]
@@ -148,6 +168,6 @@ if __name__ == "__main__":
                             ]
 
     print("Writing output edges...")
-    with open("edges_merged.json", "w") as f:
+    with open(f"kgx/edges_merged_{time}.json", "w") as f:
         json.dump(edges, f, indent=2)
     print("Merge Complete!")
