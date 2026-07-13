@@ -5,8 +5,6 @@ import logging
 import numpy as np
 import redis
 
-from ..binding_utils import binding_ids
-
 
 def compute_clinical_evidence(
     result: dict, message, logger: logging.Logger, db_conn: redis.Redis
@@ -21,7 +19,7 @@ def compute_clinical_evidence(
     # loop over all analyses in the given result and append any clinical kp edges to found_edges
     for analysis in result.get("analyses") or []:
         for edge_binding in analysis.get("edge_bindings", {}).values():
-            for edge_id in binding_ids(edge_binding):
+            for edge_id in edge_binding["ids"]:
                 try:
                     kg_edge = message["knowledge_graph"]["edges"][edge_id]
                 except KeyError:

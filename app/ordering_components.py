@@ -5,7 +5,6 @@ from tqdm import tqdm
 import traceback
 
 from .config import settings
-from .binding_utils import binding_ids
 from .clinical_evidence.compute_clinical_evidence import compute_clinical_evidence
 from .novelty.compute_novelty import compute_novelty
 
@@ -75,6 +74,6 @@ async def get_ordering_components(message, logger):
             "novelty": 0.0,
         }
         for binding in result.get("node_bindings", {}).values():
-            for kg_id in binding_ids(binding):
+            for kg_id in binding["ids"]:
                 if kg_id in novelty_scores:
                     result["ordering_components"]["novelty"] = novelty_scores[kg_id]

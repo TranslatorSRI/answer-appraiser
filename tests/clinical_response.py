@@ -69,26 +69,14 @@ response = {
     "results": [
         {
             "node_bindings": {
-                "n0": [
-                    {
-                        "id": "UMLS:C0021641",
-                    },
-                ],
-                "n1": [
-                    {
-                        "id": "MONDO:0005015",
-                    },
-                ],
+                "n0": {"ids": ["UMLS:C0021641"]},
+                "n1": {"ids": ["MONDO:0005015"]},
             },
             "analyses": [
                 {
                     "resource_id": "kp0",
                     "edge_bindings": {
-                        "n0n1": [
-                            {
-                                "id": "n0n1",
-                            },
-                        ],
+                        "n0n1": {"ids": ["n0n1"]},
                     },
                 }
             ],

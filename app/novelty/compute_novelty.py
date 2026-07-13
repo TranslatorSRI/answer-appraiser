@@ -8,7 +8,6 @@ from rdkit.Chem import rdFingerprintGenerator
 import time
 import redis
 from .gene_nmf_adapter import get_gene_nmf_novelty_for_gene_list
-from ..binding_utils import binding_ids
 from ..config import settings
 
 
@@ -16,10 +15,10 @@ def result_node_id(result, query_id_node):
     """Return the KG id of the non-query (result) node for a TRAPI result.
 
     Picks the first node-bound Knowledge Graph identifier that is not the
-    queried node. Tolerant of pre-1.5 and 1.5+ TRAPI binding formats.
+    queried node.
     """
     for binding in result["node_bindings"].values():
-        for kg_id in binding_ids(binding):
+        for kg_id in binding["ids"]:
             if kg_id != query_id_node:
                 return kg_id
     return None
@@ -227,7 +226,7 @@ def extracting_publications(message, result):
     publications = []
     for idi, i in enumerate(result["analyses"]):
         edge_keys = list(i["edge_bindings"].keys())
-        for edge_id in binding_ids(i["edge_bindings"][edge_keys[0]]):
+        for edge_id in i["edge_bindings"][edge_keys[0]]["ids"]:
             aux_graph, edges = [], []
             for idl, l in enumerate(
                 message["knowledge_graph"]["edges"][edge_id]["attributes"]
@@ -274,7 +273,7 @@ def extract_results(message, unknown, known):
             results.append([])
             for idj, j in enumerate(i["analyses"]):
                 edge_key = list(j["edge_bindings"].keys())[0]
-                for edge_id in binding_ids(j["edge_bindings"][edge_key]):
+                for edge_id in j["edge_bindings"][edge_key]["ids"]:
                     results[ukid].append(edge_id)
             ukid += 1
 
@@ -282,7 +281,7 @@ def extract_results(message, unknown, known):
             results_known.append([])
             for idj, j in enumerate(i["analyses"]):
                 edge_key = list(j["edge_bindings"].keys())[0]
-                for edge_id in binding_ids(j["edge_bindings"][edge_key]):
+                for edge_id in j["edge_bindings"][edge_key]["ids"]:
                     results_known[kid].append(edge_id)
             kid += 1
     return results, results_known
@@ -359,51 +358,17 @@ async def compute_novelty(
                 correct_results.append(idi)
                 for idj, j in enumerate(i["analyses"]):
                     edge_keys = list(j["edge_bindings"].keys())
-                    for edge_id in binding_ids(j["edge_bindings"][edge_keys[0]]):
+                    for edge_id in j["edge_bindings"][edge_keys[0]]["ids"]:
                         knowledge_graph_edge = message["knowledge_graph"]["edges"][
                             edge_id
                         ]
-                        # TRAPI >= 1.5.0: knowledge_level is a first-class,
-                        # required Edge property. Fall back to the pre-1.5 EPC
-                        # attribute representation when it is absent.
-                        knowledge_level = knowledge_graph_edge.get("knowledge_level")
-                        epc_found = 0
-                        if knowledge_level is not None:
-                            epc_found = 1
-                            if knowledge_level != "prediction":
-                                curated = 1
-                                df_numpy[idi].extend(
-                                    ["biolink:knowledge_level", knowledge_level]
-                                )
-                        else:
-                            for idl, l in enumerate(knowledge_graph_edge["attributes"]):
-                                if l["attribute_type_id"] == "biolink:knowledge_level":
-                                    epc_found = 1
-                                    if l["value"] != "prediction":
-                                        curated = 1
-                                        df_numpy[idi].extend(
-                                            [l["attribute_type_id"], l["value"]]
-                                        )
-                                    break
-                        if curated == 1 and epc_found == 1:
+                        knowledge_level = knowledge_graph_edge["knowledge_level"]
+                        if knowledge_level != "prediction":
+                            curated = 1
+                            df_numpy[idi].extend(
+                                ["biolink:knowledge_level", knowledge_level]
+                            )
                             break
-                        elif curated == 0 and epc_found == 0:
-                            for idl, l in enumerate(knowledge_graph_edge["sources"]):
-                                if l["resource_role"] == "primary_knowledge_source":
-                                    if l["resource_id"] not in [
-                                        "infores:arax",
-                                        "infores:aragorn",
-                                        "infores:biothings-explorer",
-                                        "infores:unsecret-agent",
-                                        "infores:improving-agent",
-                                        "infores:cqs",
-                                    ]:
-                                        curated = 1
-                                        df_numpy[idi].extend(
-                                            [l["resource_role"], l["resource_id"]]
-                                        )
-                                        break
-
                     if curated == 1:
                         break
                 if curated == 1:
