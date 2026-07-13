@@ -386,7 +386,7 @@ def compute_beta_tildes(
 
     # MPD - change so only return pvalues
     # return finalize_regression(beta_tildes=beta_tildes, ses=ses, se_inflation_factors=se_inflation_factors)
-    (cal_beta_tildes, cal_ses, cal_z_scores, cal_p_values, cal_se_inflation_factors) = (
+    cal_beta_tildes, cal_ses, cal_z_scores, cal_p_values, cal_se_inflation_factors = (
         finalize_regression(
             beta_tildes=beta_tildes, ses=ses, se_inflation_factors=se_inflation_factors
         )
@@ -845,7 +845,7 @@ def _calc_X_shift_scale(X, y_corr_cholesky=None):
         scale_factors = np.array([])
         mean_shifts = np.array([])
         for X_b, begin, end, batch in _get_X_blocks_internal(X, y_corr_cholesky):
-            (cur_mean_shifts, cur_scale_factors) = _calc_shift_scale(X_b)
+            cur_mean_shifts, cur_scale_factors = _calc_shift_scale(X_b)
             mean_shifts = np.append(mean_shifts, cur_mean_shifts)
             scale_factors = np.append(scale_factors, cur_scale_factors)
 

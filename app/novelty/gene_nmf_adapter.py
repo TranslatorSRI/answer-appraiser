@@ -42,7 +42,6 @@ from .dcc import dcc_utils as dutils
 from .dcc import sql_utils as sql_utils
 from .dcc import gui_utils as gutils
 
-
 # constants
 P_VALUE_CUTOFF = 0.3
 MAX_NUMBER_GENE_SETS_FOR_COMPUTATION = 100
@@ -75,7 +74,7 @@ matrix_gene_sets, map_gene_set_index = mutils.load_geneset_matrix(
 )
 
 # get the other 2 cached matrices
-(mean_shifts, scale_factors) = cutils._calc_X_shift_scale(X=matrix_gene_sets)
+mean_shifts, scale_factors = cutils._calc_X_shift_scale(X=matrix_gene_sets)
 
 print("================ Bayes NMF data structures LOADED! ===========================")
 

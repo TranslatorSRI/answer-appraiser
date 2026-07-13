@@ -34,7 +34,6 @@ import sqlite3
 
 from .dcc_utils import get_logger
 
-
 # constants
 logger = get_logger(__name__)
 SQL_SELECT_ALL_GENES = (

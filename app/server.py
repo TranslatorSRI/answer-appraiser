@@ -16,7 +16,6 @@ from .logger import setup_logger, get_logger
 from .trapi import TRAPI
 from .ordering_components import get_ordering_components
 
-
 setup_logger()
 LOGGER = logging.getLogger(__name__)
 

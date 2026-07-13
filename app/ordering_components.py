@@ -8,7 +8,6 @@ from .config import settings
 from .clinical_evidence.compute_clinical_evidence import compute_clinical_evidence
 from .novelty.compute_novelty import compute_novelty
 
-
 redis_pool = redis.ConnectionPool(
     host=settings.redis_host,
     port=settings.redis_port,
