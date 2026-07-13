@@ -23,6 +23,7 @@ def result_node_id(result, query_id_node):
                 return kg_id
     return None
 
+
 """
 This script computes the novelty score for a list of results obtained for a 1-H response using publications from 5 ARAs.
 The steps for the ideal workflow are as follows:
@@ -127,15 +128,11 @@ async def molecular_sim(known, unknown, message, query_id):
     known_ids = []
     if len(unknown) > 0:
         for drug in unknown:
-            unknown_ids.append(
-                result_node_id(message["results"][drug], query_id)
-            )
+            unknown_ids.append(result_node_id(message["results"][drug], query_id))
 
     if len(known) > 0:
         for drug in known:
-            known_ids.append(
-                result_node_id(message["results"][drug], query_id)
-            )
+            known_ids.append(result_node_id(message["results"][drug], query_id))
 
     smile_unkown = await mol_to_smile_molpro(unknown_ids)
     smile_known = await mol_to_smile_molpro(known_ids)
