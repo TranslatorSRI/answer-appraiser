@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     jaeger_enabled: bool = False
     jaeger_host: str = "jaeger"
-    jaeger_port: int = 6831
+    jaeger_port: int = 4317
     otel_service_name: str = "ANSWER-APPRAISER"
     otel_use_console_exporter: bool = False
 
