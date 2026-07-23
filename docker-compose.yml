@@ -8,18 +8,8 @@ services:
       context: .
     ports:
       - '${PORT:-9096}:9096'
-    # The clinical evidence LMDB store is read from ./data (built offline via
-    # app/clinical_evidence/merge.py and pointed at by the LMDB_PATH setting).
+    # The LMDB stores (clinical evidence + publications) are read from ./data,
+    # built offline and pointed at by the LMDB_PATH / PUBLICATIONS_LMDB_PATH
+    # settings.
     volumes:
       - ./data:/app/data
-  # Redis is still used by the novelty scorer for publication lookups.
-  redis:
-    image: redis/redis-stack-server:latest
-    container_name: answer_appraiser_redis
-    build:
-      context: redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    volumes:
-      - ./data:/data

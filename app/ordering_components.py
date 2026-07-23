@@ -6,7 +6,7 @@ import traceback
 
 from .config import settings
 from .clinical_evidence.compute_clinical_evidence import compute_clinical_evidence
-from .clinical_evidence.lmdb_store import open_env, LMDBReader
+from .lmdb_store import open_env, LMDBReader
 from .novelty.compute_novelty import compute_novelty
 
 # Lazily-opened, shared read-only LMDB environment for clinical evidence lookups.

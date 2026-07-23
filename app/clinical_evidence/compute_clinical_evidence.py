@@ -4,7 +4,7 @@ import json
 import logging
 import numpy as np
 
-from .lmdb_store import LMDBReader
+from ..lmdb_store import LMDBReader
 
 
 def compute_clinical_evidence(

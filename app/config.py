@@ -8,12 +8,11 @@ class Settings(BaseSettings):
     openapi_server_maturity: str = "development"
     openapi_server_location: str = "RENCI"
     trapi_version: str = "1.5.0"
-    # Redis is still used by the novelty scorer (publication lookups, db 1).
-    redis_host: str = "localhost"
-    redis_port: int = 6380
-    redis_password: str = "supersecretpassword"
-    # Clinical evidence edges are served from a memory-mapped LMDB store.
+    # Static lookup tables are served from memory-mapped LMDB stores.
+    # Clinical evidence edges keyed by "{subject}_{object}".
     lmdb_path: str = "./data/clinical_evidence.mdb"
+    # Publication years keyed by publication id (used by the novelty scorer).
+    publications_lmdb_path: str = "./data/publications.mdb"
 
     jaeger_enabled: bool = False
     jaeger_host: str = "jaeger"

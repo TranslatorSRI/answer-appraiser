@@ -6,9 +6,20 @@ from rdkit import Chem
 from rdkit import DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 import time
-import redis
 from .gene_nmf_adapter import get_gene_nmf_novelty_for_gene_list
 from ..config import settings
+from ..lmdb_store import open_env, LMDBReader
+
+# Lazily-opened, shared read-only LMDB environment for publication-year lookups.
+_pub_env = None
+
+
+def _get_pub_env():
+    """Open (once) and return the publications LMDB environment."""
+    global _pub_env
+    if _pub_env is None:
+        _pub_env = open_env(settings.publications_lmdb_path)
+    return _pub_env
 
 
 def result_node_id(result, query_id_node):
@@ -143,18 +154,24 @@ async def molecular_sim(known, unknown, message, query_id):
 
 
 def get_publication_info(pub_id):
-    # Connect to Redis
-    r = redis.Redis(
-        host=settings.redis_host,
-        port=settings.redis_port,
-        db=1,
-        password=settings.redis_password,
-    )
+    """Look up publication years for a list of publication ids.
+
+    Reads from the memory-mapped publications LMDB store. All lookups for the
+    given ids share a single read transaction. Returns the years that were
+    found (missing ids are skipped); returns an empty list if the store is
+    unavailable so recency scoring degrades gracefully.
+    """
     pmid_years = []
-    for key in pub_id:
-        val = r.get(key)
-        if val:
-            pmid_years.append(int(val))
+    try:
+        env = _get_pub_env()
+    except Exception:
+        return pmid_years
+    with env.begin(buffers=False) as txn:
+        reader = LMDBReader(txn)
+        for key in pub_id:
+            val = reader.get(key)
+            if val:
+                pmid_years.append(int(val))
     return pmid_years
 
 

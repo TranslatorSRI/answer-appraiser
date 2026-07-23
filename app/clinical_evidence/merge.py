@@ -2,8 +2,7 @@
 
 The merged clinical evidence edges are written directly into a memory-mapped
 LMDB store keyed by ``"{subject}_{object}"`` -> JSON-encoded list of edges,
-which the service reads at request time (see
-``app/clinical_evidence/lmdb_store.py``).
+which the service reads at request time (see ``app/lmdb_store.py``).
 """
 
 from datetime import datetime

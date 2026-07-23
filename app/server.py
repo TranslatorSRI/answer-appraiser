@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import redis
 import traceback
 import warnings
 import zstandard
@@ -12,7 +11,7 @@ from starlette.middleware.cors import CORSMiddleware
 from uuid import uuid4
 
 from .config import settings
-from .clinical_evidence.lmdb_store import open_env
+from .lmdb_store import open_env
 from .logger import setup_logger, get_logger
 from .trapi import TRAPI
 from .ordering_components import get_ordering_components
@@ -155,16 +154,12 @@ async def sync_get_appraisal(request: Request):
     return Response(query)
 
 
-@APP.get("/redis_ready")
-def check_redis_readiness():
-    """Check if redis is started and ready to accept connections (novelty)."""
+def _check_lmdb_ready(path):
+    """Raise 503 unless the LMDB store at ``path`` is present and readable."""
     try:
-        r = redis.Redis(
-            host=settings.redis_host,
-            port=settings.redis_port,
-            password=settings.redis_password,
-        )
-        r.ping()
+        env = open_env(path)
+        with env.begin() as txn:
+            txn.stat()
     except Exception:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
 
@@ -172,9 +167,10 @@ def check_redis_readiness():
 @APP.get("/clinical_evidence_ready")
 def check_clinical_evidence_readiness():
     """Check if the clinical evidence LMDB store is present and readable."""
-    try:
-        env = open_env(settings.lmdb_path)
-        with env.begin() as txn:
-            txn.stat()
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+    _check_lmdb_ready(settings.lmdb_path)
+
+
+@APP.get("/publications_ready")
+def check_publications_readiness():
+    """Check if the publications LMDB store is present and readable."""
+    _check_lmdb_ready(settings.publications_lmdb_path)

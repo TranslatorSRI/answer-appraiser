@@ -6,7 +6,7 @@ import tempfile
 
 import lmdb
 
-from app.clinical_evidence.lmdb_store import LMDBReader
+from app.lmdb_store import LMDBReader
 
 
 def dbMock():

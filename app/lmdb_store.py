@@ -1,10 +1,10 @@
-"""LMDB-backed read-only store for clinical evidence edges.
+"""LMDB-backed read-only key/value stores.
 
-The clinical evidence data is a static, bulk-loaded lookup table keyed by
-``"{subject}_{object}"`` mapping to a JSON-encoded list of clinical KP edges.
-It is served out of a memory-mapped LMDB file instead of a separate Redis
-process: reads are in-process (no network round-trip) and the OS page cache is
-shared across worker processes.
+Used for the static, bulk-loaded lookup tables the appraiser reads at request
+time (clinical evidence edges and publication years). Each is served out of a
+memory-mapped LMDB file instead of a separate Redis process: reads are
+in-process (no network round-trip) and the OS page cache is shared across
+worker processes.
 """
 
 import lmdb
