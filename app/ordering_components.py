@@ -1,19 +1,24 @@
 """Compute scores for each result in the given message."""
 
-import redis
+import contextlib
 from tqdm import tqdm
 import traceback
 
 from .config import settings
 from .clinical_evidence.compute_clinical_evidence import compute_clinical_evidence
+from .clinical_evidence.lmdb_store import open_env, LMDBReader
 from .novelty.compute_novelty import compute_novelty
 
-redis_pool = redis.ConnectionPool(
-    host=settings.redis_host,
-    port=settings.redis_port,
-    db=0,
-    password=settings.redis_password,
-)
+# Lazily-opened, shared read-only LMDB environment for clinical evidence lookups.
+_db_env = None
+
+
+def _get_db_env():
+    """Open (once) and return the clinical evidence LMDB environment."""
+    global _db_env
+    if _db_env is None:
+        _db_env = open_env(settings.lmdb_path)
+    return _db_env
 
 
 def get_confidence(result, message, logger):
@@ -45,34 +50,47 @@ async def get_novelty(message, logger):
 
 async def get_ordering_components(message, logger):
     logger.debug(f"Computing scores for {len(message['results'])} results")
-    db_conn = redis.Redis(connection_pool=redis_pool)
     novelty_scores = {}
     try:
         novelty_scores = await get_novelty(message, logger)
     except Exception:
         logger.error(f"Novelty score failed: {traceback.format_exc()}")
-    for result in tqdm(message.get("results") or []):
-        confidence = 0.0
-        try:
-            confidence = get_confidence(result, message, logger)
-        except Exception:
-            logger.error(f"Confidence score failed: {traceback.format_exc()}")
-        clinical_evidence_score = 0.0
-        try:
-            clinical_evidence_score = get_clinical_evidence(
-                result,
-                message,
-                logger,
-                db_conn,
-            )
-        except Exception:
-            logger.error(f"Clinical evidence score failed: {traceback.format_exc()}")
-        result["ordering_components"] = {
-            "confidence": confidence,
-            "clinical_evidence": clinical_evidence_score,
-            "novelty": 0.0,
-        }
-        for binding in result.get("node_bindings", {}).values():
-            for kg_id in binding["ids"]:
-                if kg_id in novelty_scores:
-                    result["ordering_components"]["novelty"] = novelty_scores[kg_id]
+
+    # Open a single read transaction for the whole message so every clinical
+    # evidence lookup is served from the same consistent snapshot. If the store
+    # can't be opened, degrade gracefully (clinical evidence scores stay 0).
+    try:
+        txn_cm = _get_db_env().begin(buffers=False)
+    except Exception:
+        logger.error(f"Clinical evidence store unavailable: {traceback.format_exc()}")
+        txn_cm = contextlib.nullcontext(None)
+
+    with txn_cm as txn:
+        db_conn = LMDBReader(txn)
+        for result in tqdm(message.get("results") or []):
+            confidence = 0.0
+            try:
+                confidence = get_confidence(result, message, logger)
+            except Exception:
+                logger.error(f"Confidence score failed: {traceback.format_exc()}")
+            clinical_evidence_score = 0.0
+            try:
+                clinical_evidence_score = get_clinical_evidence(
+                    result,
+                    message,
+                    logger,
+                    db_conn,
+                )
+            except Exception:
+                logger.error(
+                    f"Clinical evidence score failed: {traceback.format_exc()}"
+                )
+            result["ordering_components"] = {
+                "confidence": confidence,
+                "clinical_evidence": clinical_evidence_score,
+                "novelty": 0.0,
+            }
+            for binding in result.get("node_bindings", {}).values():
+                for kg_id in binding["ids"]:
+                    if kg_id in novelty_scores:
+                        result["ordering_components"]["novelty"] = novelty_scores[kg_id]

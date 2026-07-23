@@ -1,28 +1,40 @@
-"""Mock Redis."""
+"""Mock clinical evidence store."""
 
-import fakeredis
 import json
+import os
+import tempfile
+
+import lmdb
+
+from app.clinical_evidence.lmdb_store import LMDBReader
 
 
-def redisMock():
-    redis = fakeredis.FakeRedis()
-    redis.set(
-        "UMLS:C0021641_MONDO:0005015",
-        json.dumps(
-            [
-                {
-                    "log_odds_ratio": 1.5,
-                    "total_sample_size": 100,
-                },
-                {
-                    "log_odds_ratio": 0.2,
-                    "total_sample_size": 10000,
-                },
-            ]
-        ),
-    )
-    # set up mock function
-    return redis
+def dbMock():
+    """Build a temporary LMDB store and return a reader over it."""
+    tmpdir = tempfile.mkdtemp()
+    path = os.path.join(tmpdir, "clinical_evidence.mdb")
+    env = lmdb.open(path, subdir=False, map_size=10 * 1024 * 1024)
+    with env.begin(write=True) as txn:
+        txn.put(
+            b"UMLS:C0021641_MONDO:0005015",
+            json.dumps(
+                [
+                    {
+                        "log_odds_ratio": 1.5,
+                        "total_sample_size": 100,
+                    },
+                    {
+                        "log_odds_ratio": 0.2,
+                        "total_sample_size": 10000,
+                    },
+                ]
+            ).encode(),
+        )
+    reader = LMDBReader(env.begin())
+    # Keep the environment referenced so it isn't garbage-collected while the
+    # reader's transaction is still in use.
+    reader._env = env
+    return reader
 
 
 response = {

@@ -12,6 +12,7 @@ from starlette.middleware.cors import CORSMiddleware
 from uuid import uuid4
 
 from .config import settings
+from .clinical_evidence.lmdb_store import open_env
 from .logger import setup_logger, get_logger
 from .trapi import TRAPI
 from .ordering_components import get_ordering_components
@@ -156,7 +157,7 @@ async def sync_get_appraisal(request: Request):
 
 @APP.get("/redis_ready")
 def check_redis_readiness():
-    """Check if redis is started and ready to accept connections"""
+    """Check if redis is started and ready to accept connections (novelty)."""
     try:
         r = redis.Redis(
             host=settings.redis_host,
@@ -164,5 +165,16 @@ def check_redis_readiness():
             password=settings.redis_password,
         )
         r.ping()
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+@APP.get("/clinical_evidence_ready")
+def check_clinical_evidence_readiness():
+    """Check if the clinical evidence LMDB store is present and readable."""
+    try:
+        env = open_env(settings.lmdb_path)
+        with env.begin() as txn:
+            txn.stat()
     except Exception:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)

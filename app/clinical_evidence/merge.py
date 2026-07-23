@@ -1,10 +1,22 @@
-"""Script for combining multiple KGX node and edge files."""
+"""Script for combining multiple KGX node and edge files.
+
+The merged clinical evidence edges are written directly into a memory-mapped
+LMDB store keyed by ``"{subject}_{object}"`` -> JSON-encoded list of edges,
+which the service reads at request time (see
+``app/clinical_evidence/lmdb_store.py``).
+"""
 
 from datetime import datetime
 import glob
 import json
 import jsonlines
+import lmdb
 from tqdm import tqdm
+
+# Virtual address space reserved for the LMDB map. This is sparse (the file only
+# grows as data is written), so it can safely exceed the actual dataset size.
+LMDB_MAP_SIZE = 64 * 1024 * 1024 * 1024  # 64 GiB
+LMDB_OUTPUT_PATH = "kgx/clinical_evidence.mdb"
 
 if __name__ == "__main__":
     time = datetime.now().strftime("%Y_%m_%d")
@@ -168,6 +180,16 @@ if __name__ == "__main__":
                             ]
 
     print("Writing output edges...")
+    # Keep a JSON snapshot for debugging/auditing.
     with open(f"kgx/edges_merged_{time}.json", "w") as f:
         json.dump(edges, f, indent=2)
+
+    # Write the servable LMDB store consumed by the answer appraiser.
+    print(f"Writing LMDB store to {LMDB_OUTPUT_PATH}...")
+    env = lmdb.open(LMDB_OUTPUT_PATH, subdir=False, map_size=LMDB_MAP_SIZE)
+    with env.begin(write=True) as txn:
+        for key, edge_list in tqdm(edges.items()):
+            txn.put(key.encode(), json.dumps(edge_list).encode())
+    env.sync()
+    env.close()
     print("Merge Complete!")

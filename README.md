@@ -21,7 +21,11 @@ Answer Appraiser can be run locally through either python or Docker.
 
 
 ### python
-_Note: redis is also required and is easily stood up in docker._
+_Note: redis is still used by the novelty scorer and is easily stood up in docker.
+The clinical evidence scores are served from a memory-mapped LMDB store built
+offline by `app/clinical_evidence/merge.py`; point `LMDB_PATH` at that file
+(defaults to `./data/clinical_evidence.mdb`). If the store is absent, all other
+scores are still computed and clinical evidence scores default to 0._
 1. Create and activate a virtual python environment (`python3.12 -m venv <path_to_venv>`, `source <path_to_venv>`)
 1. `pip install -r requirements-lock.txt`
 1. `python run.py`

@@ -3,11 +3,12 @@
 import json
 import logging
 import numpy as np
-import redis
+
+from .lmdb_store import LMDBReader
 
 
 def compute_clinical_evidence(
-    result: dict, message, logger: logging.Logger, db_conn: redis.Redis
+    result: dict, message, logger: logging.Logger, db_conn: LMDBReader
 ):
     """Given a result, compute the clinical evidence score,
 

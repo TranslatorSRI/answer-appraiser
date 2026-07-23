@@ -9,6 +9,7 @@ opentelemetry-sdk
 pandas
 rdkit
 redis
+lmdb
 scipy
 scikit-learn
 tqdm
